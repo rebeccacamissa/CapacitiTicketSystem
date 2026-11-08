@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Requests · CAPACITI Support</title>
+  <link rel="icon" href="/assets/logo-mark.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <main id="main" class="opacity-0" data-title="Requests" data-easy="This page lists your support requests. Press a request to read it and reply. Use Search to find one." data-subtitle="Search, filter and sort">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+      <h2 class="text-2xl" id="page-title">Requests</h2>
+      <a href="/new-request" id="new-btn" class="btn btn-primary btn-shine hidden">+ New request</a>
+    </div>
+
+    <form id="filters" class="card mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-6" role="search" aria-label="Filter requests">
+      <div class="sm:col-span-2">
+        <label for="q" class="field-label">Search</label>
+        <input id="q" name="q" type="search" class="field" placeholder="Reference, subject or name">
+      </div>
+      <div><label for="status" class="field-label">Status</label><select id="status" name="status" class="field"><option value="">All</option><option value="active">All active</option></select></div>
+      <div><label for="categoryId" class="field-label">Category</label><select id="categoryId" name="categoryId" class="field"><option value="">All</option></select></div>
+      <div><label for="priority" class="field-label">Priority</label><select id="priority" name="priority" class="field"><option value="">All</option><option>Urgent</option><option>High</option><option>Medium</option><option>Low</option></select></div>
+      <div data-staff hidden><label for="assigned" class="field-label">Assigned to</label><select id="assigned" name="assigned" class="field"><option value="">Anyone</option><option value="me">Me</option><option value="unassigned">Unassigned</option></select></div>
+      <div><label for="sort" class="field-label">Sort by</label>
+        <select id="sort" name="sort" class="field">
+          <option value="updated:desc">Recently updated</option>
+          <option value="created:desc">Newest first</option>
+          <option value="created:asc">Oldest first</option>
+          <option value="priority:desc">Highest priority</option>
+          <option value="due:asc">Due soonest</option>
+          <option value="reference:asc">Reference</option>
+        </select>
+      </div>
+      <label class="flex items-center gap-2 self-end pb-2.5 text-sm" data-staff hidden><input type="checkbox" name="overdue" class="h-4 w-4 accent-salmon"> Overdue only</label>
+      <div class="flex items-end"><button type="reset" class="btn btn-ghost w-full">Clear filters</button></div>
+    </form>
+
+    <p id="result-count" class="mt-6 text-sm text-white/60" aria-live="polite"></p>
+
+    <div class="card mt-3 overflow-x-auto !p-2">
+      <table class="table-base">
+        <caption class="sr-only">Support requests</caption>
+        <thead><tr><th scope="col">Reference</th><th scope="col">Subject</th><th scope="col" data-staff hidden>Candidate</th><th scope="col">Category</th><th scope="col">Priority</th><th scope="col">Status</th><th scope="col" data-staff hidden>Assignee</th><th scope="col">Updated</th></tr></thead>
+        <tbody id="rows" class="stagger"></tbody>
+      </table>
+    </div>
+
+    <nav id="pager" class="mt-4 flex items-center justify-between gap-3" aria-label="Pagination"></nav>
+  </main>
+  <script type="module" src="/js/pages/requests.js"></script>
+</body>
+</html>

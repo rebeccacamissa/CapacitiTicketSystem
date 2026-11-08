@@ -1,0 +1,16 @@
+Command: npm run demo:illegal
+Generated: 2026-11-08T20:48:19.184Z · Node v24.12.0 · win32
+
+
+Request REQ-2026-0001 is "Open". Raw SQL, no application code:
+
+  ✘ Open → Closed (illegal jump): BLOCKED → ILLEGAL_TRANSITION: transition not permitted by workflow
+  ✘ Open → Resolved (illegal jump): BLOCKED → ILLEGAL_TRANSITION: transition not permitted by workflow
+  ✘ Open → Assigned (audited) but no assignee: BLOCKED → ASSIGNEE_REQUIRED: request must be assigned to a staff member
+  ✘ Open → Assigned with assignee but NO audit row: BLOCKED → AUDIT_REQUIRED: status change has no matching audit_log entry
+  ✘ Tamper with audit_log: BLOCKED → AUDIT_LOG_IMMUTABLE: audit entries cannot be modified
+  ✘ Delete audit_log: BLOCKED → AUDIT_LOG_IMMUTABLE: audit entries cannot be deleted
+
+With audit row + assignee (legal path):
+  ✔ Open → Assigned: accepted (status now "Assigned")
+

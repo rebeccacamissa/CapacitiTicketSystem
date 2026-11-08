@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Profile & avatar · CAPACITI Support</title>
+  <link rel="icon" href="/assets/logo-mark.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <main id="main" class="opacity-0 space-y-6" data-title="Profile & avatar" data-easy="Here you can change your picture, your details, your password and your accessibility settings." data-subtitle="Your account">
+    <section id="avatar" class="card scroll-mt-28" aria-labelledby="avatar-title">
+      <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 id="avatar-title" class="text-xl">Avatar studio</h2>
+          <p class="text-sm text-white/60">Design your look. Cammy, your assistant, wears it too.</p>
+        </div>
+      </div>
+      <div id="builder"><div class="skeleton h-80 w-full"></div></div>
+    </section>
+
+    <section id="achievements" class="card scroll-mt-28" aria-labelledby="ach-title">
+      <h2 id="ach-title" class="text-xl">Achievements</h2>
+      <div id="ach" class="mt-4"></div>
+    </section>
+
+    <section id="access-needs" class="card scroll-mt-28" aria-labelledby="needs-title">
+      <h2 id="needs-title" class="text-xl">My accessibility needs</h2>
+      <p class="mt-1 text-sm text-white/60">Optional. Tell the support team what helps you, so they can arrange support such as an interpreter or extra time. Only you and the support team can see this.</p>
+      <form id="needs-form" class="mt-4 space-y-4">
+        <fieldset><legend class="sr-only">Accessibility needs</legend><div id="needs-list" class="grid gap-2 sm:grid-cols-2"></div></fieldset>
+        <div><label for="needs-notes" class="field-label">Anything else we should know? <span class="font-normal text-white/50">(optional)</span></label>
+          <textarea id="needs-notes" name="notes" rows="2" maxlength="500" class="field" data-voice></textarea></div>
+        <div class="flex flex-wrap justify-between gap-3"><a href="/new-request?category=Accessibility%20support" class="btn btn-ghost">Request accessibility support</a><button class="btn btn-primary">Save my needs</button></div>
+      </form>
+    </section>
+
+    <div class="grid gap-6 lg:grid-cols-2">
+      <form id="details" class="card space-y-4" novalidate aria-labelledby="details-title">
+        <h2 id="details-title" class="text-lg">Personal details</h2>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div><label for="firstName" class="field-label">First name</label><input id="firstName" name="firstName" class="field" maxlength="60"><p class="field-error" data-error-for="firstName"></p></div>
+          <div><label for="surname" class="field-label">Surname</label><input id="surname" name="surname" class="field" maxlength="60"><p class="field-error" data-error-for="surname"></p></div>
+          <div><label for="dateOfBirth" class="field-label">Date of birth</label><input id="dateOfBirth" name="dateOfBirth" type="date" class="field"><p class="field-error" data-error-for="dateOfBirth"></p></div>
+          <div><label for="gender" class="field-label">Gender</label>
+            <select id="gender" name="gender" class="field"><option value="female">Female</option><option value="male">Male</option><option value="non-binary">Non-binary</option><option value="prefer-not">Prefer not to say</option></select></div>
+          <div class="sm:col-span-2"><label for="email" class="field-label">Email</label><input id="email" class="field opacity-60" disabled></div>
+        </div>
+        <div id="role-details" class="grid gap-2 sm:grid-cols-2"></div>
+        <div class="flex justify-end"><button class="btn btn-primary">Save details</button></div>
+      </form>
+
+      <div class="space-y-6">
+        <section class="card space-y-4" aria-labelledby="a11y-title">
+          <h2 id="a11y-title" class="text-lg">Accessibility & language</h2>
+          <p class="text-sm text-white/60">Text size, high contrast, easier fonts, read aloud, voice input, reading guide and more.</p>
+          <button type="button" id="open-a11y" class="btn btn-primary w-full">Open accessibility settings</button>
+          <div><label for="language" class="field-label">Language</label><select id="language" class="field"></select></div>
+          <button type="button" id="replay-tour" class="btn btn-ghost w-full">Replay Cammy's walkthrough</button>
+        </section>
+
+        <form id="password-form" class="card space-y-4" novalidate aria-labelledby="pw-title">
+          <h2 id="pw-title" class="text-lg">Change password</h2>
+          <div><label for="currentPassword" class="field-label">Current password</label><input id="currentPassword" name="currentPassword" type="password" autocomplete="current-password" class="field"><p class="field-error" data-error-for="currentPassword"></p></div>
+          <div><label for="newPassword" class="field-label">New password</label><input id="newPassword" name="newPassword" type="password" autocomplete="new-password" class="field"><p class="field-error" data-error-for="newPassword"></p></div>
+          <div><label for="confirm" class="field-label">Confirm new password</label><input id="confirm" name="confirm" type="password" autocomplete="new-password" class="field"><p class="field-error" data-error-for="confirm"></p></div>
+          <div class="flex justify-end"><button class="btn btn-ghost">Update password</button></div>
+        </form>
+      </div>
+    </div>
+  </main>
+  <script type="module" src="/js/pages/profile.js"></script>
+</body>
+</html>

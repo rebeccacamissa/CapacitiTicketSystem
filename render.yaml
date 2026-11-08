@@ -1,0 +1,33 @@
+# Render Blueprint — one web service serves both the frontend and the API.
+# SQLite + uploads live on a persistent disk (requires a paid Render instance type;
+# on the free plan data resets on every deploy/restart).
+services:
+  - type: web
+    name: capaciti-support
+    runtime: node
+    plan: starter
+    buildCommand: npm ci --include=dev && npm run build:css && npm run i18n
+    startCommand: npm run start:prod
+    healthCheckPath: /api/health
+    disk:
+      name: capaciti-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 8h
+      - key: DB_PATH
+        value: /var/data/capaciti.db
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
+      - key: BCRYPT_ROUNDS
+        value: "12"
+      # Assessment/demo deployments only — turn off for real use.
+      - key: DEMO_MODE
+        value: "true"
+      - key: ALLOW_DEMO_IN_PRODUCTION
+        value: "true"

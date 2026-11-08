@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Control centre · CAPACITI Support</title>
+  <link rel="icon" href="/assets/logo-mark.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <main id="main" class="opacity-0 space-y-6" data-title="Control centre" data-easy="Add, change or remove users here. You can also manage request categories." data-subtitle="Administrator">
+    <section class="glass relative overflow-hidden p-6 sm:p-8" aria-labelledby="hero-title">
+      <div class="absolute inset-0 bg-gradient-to-br from-salmon/30 via-purple/20 to-transparent"></div>
+      <div class="absolute -right-10 -bottom-20 h-64 w-64 rounded-full bg-purple/40 blur-3xl animate-drift-a"></div>
+      <div class="relative flex flex-wrap items-end justify-between gap-6">
+        <div>
+          <p class="chip !border-white/20">Administrator</p>
+          <h2 id="hero-title" class="mt-4 text-3xl sm:text-4xl">Everything, <span class="text-gradient">under control.</span></h2>
+          <p class="mt-2 max-w-xl text-white/70">Add and remove users, manage roles, configure request categories and review analytics.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" id="add-user" data-tour="add-user" class="btn btn-light btn-shine">Add user</button>
+          <a href="/insights" class="btn btn-ghost">Analytics</a>
+        </div>
+      </div>
+      <div id="kpis" class="stagger relative mt-6 grid grid-cols-2 gap-3 md:grid-cols-4"></div>
+    </section>
+
+    <section class="card" data-tour="users" aria-labelledby="users-title">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="users-title" class="text-lg">Users &amp; roles</h2>
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="flex rounded-xl border border-white/10 bg-white/5 p-1" role="group" aria-label="Filter by role" id="role-filter"></div>
+          <label for="user-search" class="sr-only">Search users</label>
+          <input id="user-search" type="search" class="field !w-56 !py-2" placeholder="Search users">
+        </div>
+      </div>
+      <div class="mt-4 overflow-x-auto">
+        <table class="table-base">
+          <thead><tr><th scope="col">User</th><th scope="col">Role</th><th scope="col">Details</th><th scope="col">Status</th><th scope="col" class="text-right">Actions</th></tr></thead>
+          <tbody id="users"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="grid gap-6 xl:grid-cols-2">
+      <section class="card" data-tour="categories" aria-labelledby="cats-title">
+        <h2 id="cats-title" class="text-lg">Request categories</h2>
+        <p class="text-xs text-white/50">"Blocker" categories show as active support intervention on candidate roadmaps.</p>
+        <form id="new-cat-form" class="mt-4 grid gap-2 sm:grid-cols-[1fr_1.4fr_auto_auto]" novalidate>
+          <label class="sr-only" for="nc-name">Category name</label><input id="nc-name" name="name" class="field" required maxlength="60" placeholder="Name">
+          <label class="sr-only" for="nc-desc">Description</label><input id="nc-desc" name="description" class="field" maxlength="200" placeholder="Description">
+          <label class="flex items-center gap-2 px-1 text-sm"><input type="checkbox" name="isBlocker" class="h-4 w-4 accent-salmon"> Blocker</label>
+          <button class="btn btn-primary">Add</button>
+        </form>
+        <div class="mt-4 overflow-x-auto"><table class="table-base"><thead><tr><th scope="col">Category</th><th scope="col">Requests</th><th scope="col">Blocker</th><th scope="col">Active</th></tr></thead><tbody id="cats"></tbody></table></div>
+      </section>
+
+      <section class="card" aria-labelledby="probe-title">
+        <h2 id="probe-title" class="text-lg">Workflow enforcement probe</h2>
+        <p class="mt-1 text-sm text-white/60">Fires a raw <code class="rounded bg-white/10 px-1">UPDATE requests SET status = …</code> that <strong>skips all application validation</strong> to prove the database triggers block illegal transitions. Always rolled back.</p>
+        <form id="probe-form" class="mt-4 grid gap-3 sm:grid-cols-2">
+          <div><label class="field-label" for="pr-ref">Request</label><select id="pr-ref" name="requestId" class="field"></select></div>
+          <div><label class="field-label" for="pr-to">Target status</label><select id="pr-to" name="toStatus" class="field"></select></div>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="withAudit" class="h-4 w-4 accent-purple" checked> Write audit row</label>
+          <button class="btn btn-accent">Run probe</button>
+        </form>
+        <pre id="probe-out" class="mt-4 hidden overflow-x-auto rounded-2xl border border-white/10 bg-ink/80 p-4 text-xs text-white/85" aria-live="polite"></pre>
+      </section>
+    </div>
+  </main>
+  <script type="module" src="/js/pages/admin.js"></script>
+</body>
+</html>

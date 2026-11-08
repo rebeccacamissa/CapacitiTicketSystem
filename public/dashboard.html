@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My dashboard · CAPACITI Support</title>
+  <link rel="icon" href="/assets/logo-mark.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <main id="main" class="opacity-0 space-y-6" data-title="My dashboard" data-easy="This is your home page. You can see how far you are in the programme, ask for help, and check your requests. To get help, press &quot;New request&quot;." data-subtitle="Candidate">
+    <div class="grid gap-6 xl:grid-cols-3">
+      <section id="hero" data-tour="hero" class="glass relative min-h-[22rem] overflow-hidden xl:col-span-2" aria-labelledby="hero-title">
+        <div class="absolute inset-0 bg-gradient-to-br from-purple/40 via-transparent to-salmon/30"></div>
+        <div class="absolute -right-20 -bottom-24 h-80 w-80 rounded-full border border-white/10"></div>
+        <div class="absolute -right-6 -bottom-10 h-64 w-64 rounded-full border border-white/10"></div>
+        <a href="/profile#avatar" id="hero-avatar" class="group absolute right-2 bottom-0 hidden h-[94%] w-[40%] sm:block" aria-label="Open the Avatar studio"></a>
+        <div class="relative flex h-full flex-col justify-between gap-8 p-6 sm:p-8">
+          <div class="max-w-md">
+            <div class="flex flex-wrap gap-2"><p class="chip !border-white/20 !text-white/80" id="hero-chip">Candidate</p><p class="chip !border-salmon/40 !text-salmon-50" id="hero-level">Level 1</p></div>
+            <h2 id="hero-title" class="mt-4 text-3xl leading-tight sm:text-5xl">Hi there</h2>
+            <p id="hero-sub" class="mt-3 max-w-sm text-white/70"></p>
+            <div class="mt-6 flex flex-wrap gap-3">
+              <a href="/new-request" class="btn btn-light btn-shine" id="new-req"></a>
+              <button type="button" id="ask-cammy" class="btn btn-ghost"></button>
+            </div>
+          </div>
+          <div id="stats" class="glass relative z-10 grid max-w-full grid-cols-2 gap-4 !rounded-2xl !bg-ink/40 p-4 sm:max-w-[58%] sm:grid-cols-4" aria-label="Your request summary"></div>
+        </div>
+      </section>
+
+      <div class="grid gap-6 sm:grid-cols-2 xl:grid-cols-1">
+        <section id="birthday" data-tour="birthday" data-secondary class="glass glow-ring relative overflow-hidden p-5" aria-labelledby="bday-title"></section>
+        <section id="profile" class="glass glow-ring p-5" aria-labelledby="profile-title"></section>
+      </div>
+    </div>
+
+    <div id="roadmap-wrap" data-tour="roadmap" class="scroll-mt-28"></div>
+
+    <div class="grid gap-6 xl:grid-cols-3">
+      <section class="card xl:col-span-2" aria-labelledby="recent-title">
+        <div class="flex items-center justify-between gap-4">
+          <h2 id="recent-title" class="text-lg">My recent requests</h2>
+          <a href="/requests" class="text-sm font-semibold text-salmon-50 hover:underline">View all</a>
+        </div>
+        <ul id="recent" class="stagger mt-4 space-y-2"></ul>
+      </section>
+      <div class="space-y-6">
+        <section class="card" data-tour="feed" data-secondary aria-labelledby="feed-title">
+          <div class="flex items-center justify-between gap-3"><h2 id="feed-title" class="text-lg">Cohort feed</h2><a href="/feed" class="text-sm font-semibold text-salmon-50 hover:underline">Open</a></div>
+          <ul id="feed" class="stagger mt-4 space-y-3"></ul>
+        </section>
+        <section class="card" data-secondary aria-labelledby="cohort-title">
+          <h2 id="cohort-title" class="text-lg">Upcoming birthdays</h2>
+          <ul id="upcoming" class="stagger mt-4 space-y-2"></ul>
+        </section>
+      </div>
+    </div>
+  </main>
+  <script type="module" src="/js/pages/dashboard.js"></script>
+</body>
+</html>

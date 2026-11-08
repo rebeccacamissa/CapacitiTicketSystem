@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Candidates · CAPACITI Support</title>
+  <link rel="icon" href="/assets/logo-mark.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <main id="main" class="opacity-0" data-title="Candidates" data-easy="Choose a candidate on the left to see and change their details and progress." data-subtitle="Update candidate information & progress">
+    <div class="grid gap-6 lg:grid-cols-[20rem_1fr]">
+      <aside class="card !p-3 lg:sticky lg:top-28 lg:self-start">
+        <label for="cand-search" class="sr-only">Search candidates</label>
+        <input id="cand-search" type="search" class="field" placeholder="Search name, email, cohort">
+        <ul id="cand-list" class="stagger mt-3 max-h-[65vh] space-y-1 overflow-y-auto pr-1" role="listbox" aria-label="Candidates"></ul>
+      </aside>
+      <div id="detail" class="space-y-6">
+        <div class="card text-sm text-white/60">Choose a candidate to view and update their details.</div>
+      </div>
+    </div>
+  </main>
+  <script type="module" src="/js/pages/candidates.js"></script>
+</body>
+</html>

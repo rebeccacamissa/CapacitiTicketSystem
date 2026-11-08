@@ -1,0 +1,39 @@
+{
+  "name": "capaciti-support",
+  "version": "1.0.0",
+  "description": "CAPACITI Candidate Support & Service Request System",
+  "main": "server/server.js",
+  "private": true,
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "build:css": "tailwindcss -i ./src/tailwind.css -o ./public/css/app.css --minify",
+    "watch:css": "tailwindcss -i ./src/tailwind.css -o ./public/css/app.css --watch",
+    "db:reset": "node --disable-warning=ExperimentalWarning server/db/seed.js --reset",
+    "db:seed": "node --disable-warning=ExperimentalWarning server/db/seed.js",
+    "prestart": "npm run build:css",
+    "start": "node --disable-warning=ExperimentalWarning server/server.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server/server.js",
+    "demo:illegal": "node --disable-warning=ExperimentalWarning scripts/demo-illegal-transition.js",
+    "test": "node --disable-warning=ExperimentalWarning --test tests/*.test.js",
+    "i18n": "node scripts/build-i18n.js",
+    "start:prod": "node --disable-warning=ExperimentalWarning server/db/seed.js && node --disable-warning=ExperimentalWarning server/server.js",
+    "test:report": "node --disable-warning=ExperimentalWarning --test --test-reporter=spec tests/*.test.js",
+    "evidence": "node scripts/capture-evidence.js"
+  },
+  "dependencies": {
+    "@dicebear/collection": "^9.4.2",
+    "@dicebear/core": "^9.4.3",
+    "bcryptjs": "^3.0.2",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.0",
+    "tailwindcss": "^4.1.0"
+  }
+}

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in · CAPACITI Support</title>
+  <link rel="icon" href="/assets/logo-mark.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <div id="bg"></div>
+  <main id="main" class="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
+    <section class="relative hidden flex-col justify-between overflow-hidden p-12 lg:flex">
+      <div id="brand" class="animate-fade-up"></div>
+      <div class="relative">
+        <div class="max-w-lg animate-fade-up [animation-delay:100ms]">
+          <p class="chip mb-5 !text-salmon-50">Candidate Support Portal</p>
+          <h1 class="text-5xl leading-[1.08] xl:text-6xl">Support that keeps you <span class="text-gradient">moving forward.</span></h1>
+          <p class="mt-5 text-lg text-white/65">Raise a request, follow every step, and watch your journey from training to internship unfold — live.</p>
+        </div>
+        <div class="relative mt-10 flex items-end gap-6">
+          <div id="hero-avatars" class="flex shrink-0 items-end gap-3 animate-fade-up [animation-delay:250ms]"></div>
+          <div class="stagger mb-6 space-y-3">
+            <div class="glass flex items-center gap-3 !rounded-2xl px-4 py-3 animate-float"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-ok/20 text-ok" data-icon="check"></span><span class="text-sm"><strong>REQ-2026-0042</strong> resolved<span class="block text-xs text-white/50">Learning platform access · 2h</span></span></div>
+            <div class="glass ml-10 flex items-center gap-3 !rounded-2xl px-4 py-3 animate-float [animation-delay:1.2s]"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-salmon/25 text-salmon-50" data-icon="flag"></span><span class="text-sm">Milestone unlocked<span class="block text-xs text-white/50">Work Ready · 4 of 5</span></span></div>
+          </div>
+        </div>
+      </div>
+      <p class="text-xs text-white/40">© CAPACITI · A division of UVU Africa</p>
+    </section>
+
+    <section class="flex items-center justify-center p-5 sm:p-10">
+      <div class="glass w-full max-w-md p-7 animate-fade-up sm:p-9">
+        <div id="brand-mobile" class="mb-8 lg:hidden"></div>
+        <h2 class="text-2xl sm:text-3xl">Welcome back</h2>
+        <p class="mt-1 text-sm text-white/60">Sign in to continue to your dashboard.</p>
+
+        <div id="form-alert" role="alert" class="mt-6 hidden rounded-xl border border-salmon/40 bg-salmon/15 px-4 py-3 text-sm text-salmon-50"></div>
+
+        <form id="login-form" class="mt-6 space-y-5" novalidate>
+          <div>
+            <label for="email" class="field-label">Email</label>
+            <input id="email" name="email" type="email" autocomplete="email" required class="field" placeholder="you@example.com">
+            <p class="field-error" data-error-for="email"></p>
+          </div>
+          <div>
+            <label for="password" class="field-label">Password</label>
+            <div class="relative">
+              <input id="password" name="password" type="password" autocomplete="current-password" required class="field pr-16">
+              <button type="button" data-toggle-pw class="absolute inset-y-0 right-2 my-auto h-8 rounded-lg px-2 text-xs font-semibold text-white/60 hover:text-white" aria-pressed="false">Show</button>
+            </div>
+            <p class="field-error" data-error-for="password"></p>
+          </div>
+          <button type="submit" class="btn btn-primary btn-shine w-full !py-3">Sign in</button>
+        </form>
+
+        <div id="demo" class="mt-7 hidden">
+          <div class="flex items-center gap-3 text-xs text-white/40"><span class="h-px flex-1 bg-white/10"></span>DEMO · ONE-CLICK SIGN-IN<span class="h-px flex-1 bg-white/10"></span></div>
+          <div id="demo-buttons" class="stagger mt-3 grid gap-2"></div>
+        </div>
+
+        <p class="mt-7 text-center text-sm text-white/60">New candidate? <a href="/register" class="font-semibold text-salmon-50 hover:underline">Create your account</a></p>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="/js/pages/login.js"></script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+Command: npm run test:report
+Generated: 2026-11-08T20:48:19.184Z · Node v24.12.0 · win32
+
+✔ state machine rules (application layer) (592.2756ms)
+✔ registration always creates a candidate and rejects weak passwords (66.9161ms)
+✔ candidate creates request with REQ-YYYY-NNNN reference (38.7379ms)
+✔ candidates cannot see other candidates' requests (55.3061ms)
+✔ illegal transition Open → Closed is rejected with 409 (40.2362ms)
+✔ DB probe proves the trigger blocks illegal transitions independently (44.4052ms)
+✔ full workflow with audit trail + candidate auto-transition on reply (194.8921ms)
+✔ admin override is allowed, audited, and one-shot (54.9755ms)
+✔ audit log is immutable (7.9274ms)
+✔ roadmap active node advances as requirements are verified (132.5584ms)
+✔ analytics summary is staff-only (39.0119ms)
+✔ admin creates staff with a temporary password that must be changed (141.6361ms)
+✔ support can update candidate programme details; candidates cannot (69.4891ms)
+✔ Cammy answers with personalised context (66.3529ms)
+✔ new users get a plain gender-based avatar; designs are validated and locked items enforced (165.9618ms)
+✔ candidate rates a resolved request; attachments are type-checked and access controlled (155.4531ms)
+✔ cohort feed: staff announce, everyone reacts; search is scoped (99.9368ms)
+✔ preferences and walkthrough completion persist (46.0623ms)
+✔ accessibility needs are private to the candidate and staff (64.7609ms)
+✔ language preference is saved and Cammy answers in that language (80.8661ms)
+✔ extended accessibility preferences validate (29.2114ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11315.1317

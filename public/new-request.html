@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>New request · CAPACITI Support</title>
+  <link rel="icon" href="/assets/logo-mark.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <main id="main" class="opacity-0 !max-w-3xl" data-title="New support request" data-easy="Use this page to ask for help. Choose what it is about, say how urgent it is, and explain the problem. Then press &quot;Submit request&quot;." data-subtitle="We'll get back to you fast">
+    <form id="request-form" class="card space-y-6" novalidate>
+      <div>
+        <h2 class="text-2xl">What can we help with?</h2>
+        <p class="mt-1 text-sm text-white/60">Tell us what's going on. You'll get a reference number to track progress.</p>
+      </div>
+      <div id="form-alert" role="alert" class="hidden rounded-xl border border-salmon/40 bg-salmon/15 px-4 py-3 text-sm text-salmon-50"></div>
+
+      <fieldset>
+        <legend class="field-label">Category</legend>
+        <div id="cat-grid" class="stagger grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5"></div>
+        <input type="hidden" name="categoryId">
+        <p id="cat-desc" class="mt-2 min-h-4 text-xs text-white/50"></p>
+        <p class="field-error" data-error-for="categoryId"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend class="field-label">How urgent is it?</legend>
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-4" id="priority-group">
+          <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm transition hover:border-white/30 has-[:checked]:border-purple-50 has-[:checked]:bg-purple/25"><input type="radio" name="priority" value="Low" class="accent-purple"> Low <span class="ml-auto text-xs text-white/40">5d</span></label>
+          <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm transition hover:border-white/30 has-[:checked]:border-purple-50 has-[:checked]:bg-purple/25"><input type="radio" name="priority" value="Medium" class="accent-purple" checked> Medium <span class="ml-auto text-xs text-white/40">3d</span></label>
+          <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm transition hover:border-white/30 has-[:checked]:border-salmon-50 has-[:checked]:bg-salmon/15"><input type="radio" name="priority" value="High" class="accent-salmon"> High <span class="ml-auto text-xs text-white/40">24h</span></label>
+          <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm transition hover:border-white/30 has-[:checked]:border-salmon has-[:checked]:bg-salmon/30"><input type="radio" name="priority" value="Urgent" class="accent-salmon"> Urgent <span class="ml-auto text-xs text-white/40">4h</span></label>
+        </div>
+      </fieldset>
+
+      <div>
+        <label for="title" class="field-label">Subject</label>
+        <input id="title" name="title" data-voice required minlength="5" maxlength="150" class="field" placeholder="e.g. Can't log in to the learning platform">
+        <p class="field-error" data-error-for="title"></p>
+      </div>
+
+      <div>
+        <label for="description" class="field-label">Describe the issue</label>
+        <textarea id="description" name="description" data-voice rows="6" required minlength="10" maxlength="5000" class="field" placeholder="What happened, when it started, and anything you've already tried."></textarea>
+        <div class="mt-1 flex justify-between text-xs"><p class="field-error" data-error-for="description"></p><span id="desc-count" class="text-white/50">0 / 5000</span></div>
+      </div>
+
+      <div id="attach"></div>
+
+      <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <a href="/requests" class="btn btn-ghost">Cancel</a>
+        <button type="submit" class="btn btn-primary btn-shine">Submit request</button>
+      </div>
+    </form>
+
+    <div id="success" class="card hidden text-center" role="status" tabindex="-1">
+      <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-purple to-salmon text-white shadow-lg shadow-salmon/30 animate-pop">
+        <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" class="draw" style="--len:30"/></svg>
+      </div>
+      <h2 class="mt-4 text-2xl">Request submitted</h2>
+      <p class="mt-1 text-sm text-white/60">Your reference number is</p>
+      <p id="ref" class="mt-1 font-display text-3xl font-semibold tracking-wide text-gradient"></p>
+      <div class="mt-6 flex justify-center gap-3"><a id="view-link" class="btn btn-primary" href="#">View request</a><a class="btn btn-ghost" href="/dashboard">Dashboard</a></div>
+    </div>
+  </main>
+  <script type="module" src="/js/pages/new-request.js"></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cohort feed · CAPACITI Support</title>
+  <link rel="icon" href="/assets/logo-mark.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <main id="main" class="opacity-0 !max-w-3xl space-y-6" data-title="Cohort feed" data-easy="News from your programme team and your cohort. Press a small button under a post to react." data-subtitle="Announcements, milestones and celebrations">
+    <form id="compose" class="card space-y-3" hidden novalidate>
+      <label for="body" class="field-label">Post an announcement</label>
+      <textarea id="body" name="body" data-voice rows="3" maxlength="1000" class="field" placeholder="Share news, reminders or a shout-out…"></textarea>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2"><label for="cohort" class="text-sm text-white/60">Audience</label>
+          <select id="cohort" name="cohort" class="field !w-auto !py-1.5"><option value="">Everyone</option></select></div>
+        <button class="btn btn-primary btn-shine">Post</button>
+      </div>
+    </form>
+    <p id="new-posts" class="hidden text-center"><button type="button" class="chip !border-salmon/40 !text-salmon-50">New posts. Show them</button></p>
+    <ul id="feed" class="stagger space-y-3"></ul>
+    <div class="text-center"><button type="button" id="more" class="btn btn-ghost" hidden>Load more</button></div>
+  </main>
+  <script type="module" src="/js/pages/feed.js"></script>
+</body>
+</html>

@@ -1,0 +1,240 @@
+# Database design
+
+- **Engine:** SQLite 3.50, using Node's built-in `node:sqlite`, with WAL journal mode and foreign keys enforced.
+- **Schema:** [`server/db/schema.sql`](../server/db/schema.sql). It is applied automatically and idempotently on start-up.
+
+## Entity-relationship diagram
+
+```mermaid
+erDiagram
+    users ||--o| candidate_profiles : "has (candidates)"
+    users ||--o| staff_profiles : "has (staff)"
+    users ||--o{ requests : "raises (candidate_id)"
+    users ||--o{ requests : "is assigned (assigned_to)"
+    categories ||--o{ requests : classifies
+    request_statuses ||--o{ requests : "current status"
+    request_statuses ||--o{ status_transitions : "from / to"
+    priority_sla ||--o{ requests : "sets SLA"
+    requests ||--o{ request_messages : has
+    requests ||--o{ audit_log : "history of"
+    requests ||--o| transition_overrides : "one-shot admin token"
+    requests ||--o{ attachments : has
+    requests ||--o| request_ratings : "rated by candidate"
+    users ||--o{ request_messages : writes
+    users ||--o{ audit_log : "changed_by"
+    milestones ||--o{ milestone_requirements : contains
+    milestone_requirements ||--o{ candidate_requirement_progress : "completed in"
+    users ||--o{ candidate_requirement_progress : "progress of"
+    users ||--o{ xp_events : earns
+    users ||--o{ user_badges : holds
+    users ||--o{ feed_posts : "author / subject"
+    feed_posts ||--o{ feed_reactions : receives
+
+    users {
+        INTEGER id PK
+        TEXT full_name
+        TEXT first_name
+        TEXT surname
+        TEXT email UK "COLLATE NOCASE"
+        TEXT password_hash "bcrypt"
+        TEXT role "candidate | support | admin"
+        INTEGER is_active
+        TEXT date_of_birth "YYYY-MM-DD"
+        TEXT gender
+        TEXT avatar_config "JSON design"
+        TEXT preferences "JSON theme/a11y"
+        TEXT accessibility "JSON needs (private)"
+        TEXT language "en zu xh af nso"
+        INTEGER tour_done
+        INTEGER must_change_password
+        TEXT created_at
+    }
+    candidate_profiles {
+        INTEGER user_id PK,FK
+        TEXT cohort
+        TEXT stream
+        TEXT mentor
+        TEXT tech_champ
+        TEXT supervisor
+        INTEGER updated_by FK
+    }
+    staff_profiles {
+        INTEGER user_id PK,FK
+        TEXT position
+        TEXT employee_id UK
+    }
+    categories {
+        INTEGER id PK
+        TEXT name UK
+        TEXT description
+        INTEGER is_blocker "affects roadmap"
+        INTEGER is_active
+    }
+    request_statuses {
+        TEXT name PK
+        INTEGER sort_order
+        INTEGER is_terminal
+    }
+    status_transitions {
+        TEXT from_status PK,FK
+        TEXT to_status PK,FK
+    }
+    priority_sla {
+        TEXT priority PK
+        INTEGER hours
+        INTEGER rank
+    }
+    reference_counters {
+        INTEGER year PK
+        INTEGER last_value
+    }
+    requests {
+        INTEGER id PK
+        TEXT reference UK "REQ-YYYY-NNNN"
+        INTEGER candidate_id FK
+        INTEGER category_id FK
+        TEXT title
+        TEXT description
+        TEXT priority FK
+        TEXT status FK
+        INTEGER assigned_to FK
+        TEXT resolution
+        TEXT due_at
+        TEXT created_at
+        TEXT updated_at
+        TEXT resolved_at
+        TEXT closed_at
+    }
+    request_messages {
+        INTEGER id PK
+        INTEGER request_id FK
+        INTEGER author_id FK
+        TEXT body
+        INTEGER is_internal
+        TEXT created_at
+    }
+    audit_log {
+        INTEGER id PK
+        INTEGER request_id FK
+        INTEGER changed_by_user_id FK
+        TEXT action "CREATED STATUS_CHANGE ASSIGNMENT PRIORITY_CHANGE"
+        TEXT old_status
+        TEXT new_status
+        TEXT details
+        TEXT internal_notes
+        INTEGER is_override
+        TEXT timestamp
+    }
+    transition_overrides {
+        INTEGER request_id PK,FK
+        TEXT to_status
+        INTEGER authorized_by FK
+    }
+    attachments {
+        INTEGER id PK
+        INTEGER request_id FK
+        INTEGER uploader_id FK
+        TEXT stored_name UK
+        TEXT original_name
+        TEXT mime
+        INTEGER size
+        INTEGER is_internal
+    }
+    request_ratings {
+        INTEGER request_id PK,FK
+        INTEGER candidate_id FK
+        INTEGER rating "1-5"
+        TEXT comment
+    }
+    milestones {
+        INTEGER id PK
+        TEXT key UK
+        TEXT title
+        INTEGER sort_order
+    }
+    milestone_requirements {
+        INTEGER id PK
+        INTEGER milestone_id FK
+        TEXT label
+        INTEGER sort_order
+    }
+    candidate_requirement_progress {
+        INTEGER candidate_id PK,FK
+        INTEGER requirement_id PK,FK
+        TEXT completed_at
+        INTEGER verified_by FK
+    }
+    xp_events {
+        INTEGER id PK
+        INTEGER user_id FK
+        TEXT kind
+        TEXT ref
+        INTEGER points
+    }
+    user_badges {
+        INTEGER user_id PK,FK
+        TEXT badge_key PK
+        TEXT awarded_at
+    }
+    feed_posts {
+        INTEGER id PK
+        TEXT kind
+        INTEGER author_id FK
+        INTEGER subject_id FK
+        TEXT cohort
+        TEXT body
+        TEXT ref UK
+    }
+    feed_reactions {
+        INTEGER post_id PK,FK
+        INTEGER user_id PK,FK
+        TEXT reaction PK
+    }
+```
+
+> GitHub renders this Mermaid diagram automatically. To export a PNG, paste it into [mermaid.live](https://mermaid.live).
+
+## Table groups
+
+| Group | Tables | Purpose |
+|---|---|---|
+| Identity | `users`, `candidate_profiles`, `staff_profiles` | Accounts, role-specific details, preferences, accessibility needs, language |
+| Ticketing core | `requests`, `request_messages`, `attachments`, `request_ratings`, `categories`, `priority_sla`, `reference_counters` | Requests, conversations, files, satisfaction ratings, SLA and reference numbers |
+| Workflow engine | `request_statuses`, `status_transitions`, `transition_overrides`, `audit_log` | The state machine whitelist, admin override tokens, and the immutable history |
+| Candidate journey | `milestones`, `milestone_requirements`, `candidate_requirement_progress` | The five-milestone roadmap and verified requirements |
+| Engagement | `xp_events`, `user_badges`, `feed_posts`, `feed_reactions` | XP, badges, the cohort feed and reactions |
+
+## Integrity rules enforced by the database
+
+**Constraints**
+- `CHECK` constraints on roles, priorities, flags and lengths, the reference format (`REQ-YYYY-N…`), date of birth, `json_valid()` on JSON columns, ratings from 1 to 5, and attachment size of 5 MB or less.
+- Foreign keys everywhere. A user's profile rows are removed when the user is (`ON DELETE CASCADE`).
+
+**Triggers (the state machine)**
+
+| Trigger | Rule |
+|---|---|
+| `trg_requests_insert_open` | New requests must start as `Open`. |
+| `trg_requests_status_guard` (BEFORE UPDATE OF status) | The move must be in `status_transitions`, **or** a valid admin token must exist in `transition_overrides`. |
+| | `Assigned`, `In Progress` and `Waiting for Candidate` need an assignee. |
+| | `Resolved` needs a resolution. |
+| | The **latest `audit_log` row must describe exactly this move**, so no status change can happen without an audit record. |
+| `trg_requests_assignee_staff` | The assignee must be active support or admin staff. |
+| `trg_requests_consume_override` | The override token is deleted after use, so it works only once. |
+| `trg_audit_no_update`, `trg_audit_no_delete` | The audit log is append-only. |
+
+**Idempotency**
+- `UNIQUE (user_id, kind, ref)` on `xp_events` means XP can never be awarded twice for the same thing.
+- `UNIQUE ref` on `feed_posts` means birthday and badge posts are created only once.
+
+You can see the triggers working with `npm run demo:illegal`; the output is in [db-enforcement-demo.txt](db-enforcement-demo.txt).
+
+## Seed and reference data
+
+The schema itself inserts:
+- the 7 statuses and 11 allowed transitions;
+- SLA hours per priority: Urgent 4, High 24, Medium 72, Low 120;
+- 11 categories, 5 of them blockers;
+- 5 milestones with 18 requirements.
+
+`npm run db:reset` then loads demo users, requests, progress, ratings and feed posts. It drives every request through the real workflow code, so the audit trail is genuine.

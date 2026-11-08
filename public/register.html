@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Create account · CAPACITI Support</title>
+  <link rel="icon" href="/assets/logo-mark.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <div id="bg"></div>
+  <main id="main" class="flex min-h-screen items-center justify-center p-4 sm:p-8">
+    <div class="glass w-full max-w-2xl overflow-hidden animate-fade-up transition-[max-width] duration-500" id="reg-card">
+      <div class="flex items-center justify-between gap-4 border-b border-white/10 px-6 py-5 sm:px-8">
+        <div id="brand"></div>
+        <a href="/" class="text-sm text-white/60 hover:text-white">Have an account? <span class="font-semibold text-salmon-50">Sign in</span></a>
+      </div>
+
+      <div class="px-6 pt-6 sm:px-8">
+        <ol class="grid grid-cols-4 gap-2" id="steps" aria-label="Registration steps"></ol>
+      </div>
+
+      <div id="form-alert" role="alert" class="mx-6 mt-5 hidden rounded-xl border border-salmon/40 bg-salmon/15 px-4 py-3 text-sm text-salmon-50 sm:mx-8"></div>
+
+      <form id="reg" class="relative px-6 pt-6 pb-8 sm:px-8" novalidate>
+        <!-- Step 1 -->
+        <section data-step="0" class="space-y-5">
+          <header><h1 class="text-2xl">Tell us about you</h1><p class="text-sm text-white/60">Let's set up your candidate profile.</p></header>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div><label for="firstName" class="field-label">First name</label><input id="firstName" name="firstName" autocomplete="given-name" class="field" required maxlength="60"><p class="field-error" data-error-for="firstName"></p></div>
+            <div><label for="surname" class="field-label">Surname</label><input id="surname" name="surname" autocomplete="family-name" class="field" required maxlength="60"><p class="field-error" data-error-for="surname"></p></div>
+            <div><label for="dateOfBirth" class="field-label">Date of birth</label><input id="dateOfBirth" name="dateOfBirth" type="date" autocomplete="bday" class="field" required><p class="field-error" data-error-for="dateOfBirth"></p></div>
+            <div><label for="email" class="field-label">Email</label><input id="email" name="email" type="email" autocomplete="email" class="field" required><p class="field-error" data-error-for="email"></p></div>
+          </div>
+          <fieldset>
+            <legend class="field-label">Gender</legend>
+            <div class="grid grid-cols-2 gap-2 sm:grid-cols-4" id="gender-group">
+              <label class="cursor-pointer rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-center text-sm transition hover:border-white/30 has-[:checked]:border-salmon has-[:checked]:bg-salmon/15"><input type="radio" name="gender" value="female" class="sr-only">Female</label>
+              <label class="cursor-pointer rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-center text-sm transition hover:border-white/30 has-[:checked]:border-salmon has-[:checked]:bg-salmon/15"><input type="radio" name="gender" value="male" class="sr-only">Male</label>
+              <label class="cursor-pointer rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-center text-sm transition hover:border-white/30 has-[:checked]:border-salmon has-[:checked]:bg-salmon/15"><input type="radio" name="gender" value="non-binary" class="sr-only">Non-binary</label>
+              <label class="cursor-pointer rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-center text-sm transition hover:border-white/30 has-[:checked]:border-salmon has-[:checked]:bg-salmon/15"><input type="radio" name="gender" value="prefer-not" class="sr-only">Prefer not to say</label>
+            </div>
+            <p class="mt-1 text-xs text-white/45">Sets your starting avatar. You can design your own look later.</p>
+            <p class="field-error" data-error-for="gender"></p>
+          </fieldset>
+          <p class="text-xs text-white/45">We'll celebrate your birthday with you. Only the day and month are ever shown to others.</p>
+        </section>
+
+        <!-- Step 2 -->
+        <section data-step="1" class="space-y-5" hidden>
+          <header><h1 class="text-2xl">Your programme</h1><p class="text-sm text-white/60">Not sure yet? Leave blanks — your programme team can fill these in later.</p></header>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div><label for="cohort" class="field-label">Cohort</label><input id="cohort" name="cohort" list="cohorts" class="field" maxlength="80" placeholder="e.g. 2026 Cohort 1 · Cape Town"><datalist id="cohorts"></datalist></div>
+            <div><label for="stream" class="field-label">Stream</label><select id="stream" name="stream" class="field"><option value="">Choose your stream…</option></select></div>
+            <div><label for="mentor" class="field-label">Mentor</label><input id="mentor" name="mentor" class="field" maxlength="120"></div>
+            <div><label for="techChamp" class="field-label">Tech Champ</label><input id="techChamp" name="techChamp" class="field" maxlength="120"></div>
+            <div class="sm:col-span-2"><label for="supervisor" class="field-label">Supervisor</label><input id="supervisor" name="supervisor" class="field" maxlength="120"></div>
+          </div>
+        </section>
+
+        <!-- Step 3 -->
+        <section data-step="2" class="space-y-5" hidden>
+          <header><h1 class="text-2xl">Secure your account</h1><p class="text-sm text-white/60">Choose a strong password.</p></header>
+          <div><label for="password" class="field-label">Password</label><input id="password" name="password" type="password" autocomplete="new-password" class="field" required aria-describedby="pw-meter-label"><p class="field-error" data-error-for="password"></p>
+            <div class="mt-2 grid grid-cols-4 gap-1.5" aria-hidden="true" id="pw-meter">${'<span class="h-1.5 rounded-full bg-white/10 transition-colors duration-300"></span>'.repeat(4)}</div>
+            <p id="pw-meter-label" class="mt-1 text-xs text-white/50">8+ characters with upper-case, lower-case and a number.</p></div>
+          <div><label for="confirm" class="field-label">Confirm password</label><input id="confirm" name="confirm" type="password" autocomplete="new-password" class="field" required><p class="field-error" data-error-for="confirm"></p></div>
+        </section>
+
+        <!-- Step 4 -->
+        <section data-step="3" class="space-y-5" hidden>
+          <header><h1 class="text-2xl">Design your avatar</h1><p class="text-sm text-white/60">Pick a style and make it yours. Cammy, your assistant, will wear it too.</p></header>
+          <div id="studio"></div>
+        </section>
+
+        <div class="mt-8 flex items-center justify-between gap-3">
+          <button type="button" id="back" class="btn btn-ghost" hidden>← Back</button>
+          <span></span>
+          <div class="flex gap-2">
+            <button type="button" id="skip" class="btn btn-ghost" hidden>Skip for now</button>
+            <button type="submit" id="next" class="btn btn-primary btn-shine min-w-36">Continue →</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </main>
+  <script type="module" src="/js/pages/register.js"></script>
+</body>
+</html>

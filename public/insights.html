@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Support dashboard · CAPACITI Support</title>
+  <link rel="icon" href="/assets/logo-mark.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <main id="main" class="opacity-0 space-y-6" data-title="Support dashboard" data-easy="New requests that need someone are at the top. Press &quot;Assign to me&quot; to take one." data-subtitle="Manager / Support team">
+    <section id="hero" class="glass relative overflow-hidden p-6 sm:p-8" aria-labelledby="hero-title">
+      <div class="absolute inset-0 bg-gradient-to-r from-purple/40 via-purple/10 to-salmon/30"></div>
+      <div class="absolute -top-16 right-10 h-56 w-56 rounded-full bg-salmon/30 blur-3xl animate-drift-b"></div>
+      <div class="relative flex flex-wrap items-end justify-between gap-6">
+        <div class="max-w-xl">
+          <p class="chip !border-white/20">Support command centre</p>
+          <h2 id="hero-title" class="mt-4 text-3xl sm:text-4xl">Hello</h2>
+          <p id="hero-sub" class="mt-2 text-white/70"></p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <a href="/requests?assigned=unassigned" class="btn btn-light btn-shine">Pick up tickets</a>
+          <a href="/candidates" class="btn btn-ghost">Update candidates</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="tiles" aria-label="Headline metrics" class="stagger grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6"></section>
+
+    <div class="grid gap-6 xl:grid-cols-5">
+      <section class="card xl:col-span-3" data-tour="queue" aria-labelledby="queue-title">
+        <div class="flex items-center justify-between gap-3"><h2 id="queue-title" class="text-lg">Incoming tickets <span id="queue-count" class="badge ml-1 bg-salmon/20 text-salmon-50"></span></h2>
+          <a href="/requests?assigned=unassigned" class="text-sm font-semibold text-salmon-50 hover:underline">Full queue →</a></div>
+        <p class="text-xs text-white/50">Unassigned, highest priority first</p>
+        <ul id="queue" class="stagger mt-4 space-y-2"></ul>
+      </section>
+      <section class="card xl:col-span-2" data-tour="workload" aria-labelledby="wl-title">
+        <h2 id="wl-title" class="text-lg">Staff workload</h2>
+        <p class="text-xs text-white/50">Active cases per person</p>
+        <ul id="workload" class="stagger mt-4 space-y-3"></ul>
+      </section>
+    </div>
+
+    <div class="grid gap-6 xl:grid-cols-5">
+      <section class="card xl:col-span-3" data-tour="trend" aria-labelledby="trend-title">
+        <h2 id="trend-title" class="text-lg">Requests over the last 14 days</h2>
+        <div id="trend" class="mt-3"></div>
+      </section>
+      <section class="card xl:col-span-2" data-secondary aria-labelledby="st-title"><h2 id="st-title" class="text-lg">Status pipeline</h2><div id="by-status" class="mt-4"></div></section>
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-2">
+      <section class="card" data-secondary aria-labelledby="cat-title"><h2 id="cat-title" class="text-lg">By category</h2><p class="text-xs text-white/50">All-time count · active in brackets</p><div id="by-category" class="mt-4"></div></section>
+      <div class="space-y-6">
+        <section class="card" data-secondary aria-labelledby="pri-title"><h2 id="pri-title" class="text-lg">By priority</h2><p class="text-xs text-white/50">All-time count · active in brackets</p><div id="by-priority" class="mt-4"></div></section>
+        <section class="card" data-secondary aria-labelledby="res-title"><h2 id="res-title" class="text-lg">Avg. resolution time by category</h2><div id="resolution" class="mt-4"></div></section>
+      </div>
+    </div>
+
+    <section class="card" data-secondary aria-labelledby="csat-title">
+      <div class="flex flex-wrap items-center justify-between gap-3"><h2 id="csat-title" class="text-lg">Candidate satisfaction</h2><p class="text-xs text-white/50">Ratings given after a request is resolved</p></div>
+      <div id="csat" class="mt-4"></div>
+    </section>
+
+    <section class="card" data-secondary aria-labelledby="od-title"><h2 id="od-title" class="text-lg">Most overdue</h2><ul id="overdue" class="stagger mt-4 grid gap-2 md:grid-cols-2"></ul></section>
+  </main>
+  <script type="module" src="/js/pages/insights.js"></script>
+</body>
+</html>
