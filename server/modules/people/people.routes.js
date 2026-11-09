@@ -38,7 +38,7 @@ router.patch(
 );
 
 // ---- Birthdays & notifications ----------------------------------------------
-router.get('/people/birthdays', (req, res) => res.json(svc.birthdays(getDb())));
+router.get('/people/birthdays', authorize('candidate', 'support', 'admin'), (req, res) => res.json(svc.birthdays(getDb())));
 router.get('/notifications', (req, res) => res.json({ items: svc.notifications(getDb(), req.user) }));
 
 // ---- Candidate information (managers / support) ------------------------------

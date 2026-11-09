@@ -9,7 +9,7 @@ The frontend and the API are served by the **same** Express app, so there is no 
 |---|---|
 | Format | JSON in, JSON out (`Content-Type: application/json`). Body limit is 100 KB, or 36 MB for attachment uploads. |
 | Authentication | JWT stored in an **httpOnly, SameSite=Strict** cookie named `capaciti_token`, set by `/auth/login` or `/auth/register`. API clients may instead send `Authorization: Bearer <token>`. |
-| Authorisation | Role-based: `candidate`, `support`, `admin`. "Staff" below means `support` **or** `admin`. Candidates get **404 (not 403)** for other people's records, so the API never reveals that a record exists. |
+| Authorisation | Role-based: `candidate`, `support`, `admin`, `recruiter`. "Staff" below means `support` **or** `admin`. Recruiters can read only published candidate portfolios and cannot access requests, workflow, or candidate-management endpoints. Candidates get **404 (not 403)** for other people's records, so the API never reveals that a record exists. |
 | Dates | ISO 8601 UTC strings, e.g. `2026-11-08T10:15:30.120Z`. Dates of birth are `YYYY-MM-DD`. |
 | Rate limits | `/auth/register`, `/auth/login` and `/auth/change-password` allow 20 requests per 15 minutes per IP. `/cammy/chat` allows 40 per minute. Over the limit you get `429 RATE_LIMITED` with a `Retry-After` header. |
 | Temporary passwords | Accounts created by an admin get `403 PASSWORD_CHANGE_REQUIRED` on every endpoint except `/auth/me`, `/auth/change-password` and `/auth/logout` until the password is changed. |
@@ -66,20 +66,34 @@ curl -c jar.txt -H "Content-Type: application/json" \
 
 | Method | Path | Access | Body / query | Response |
 |---|---|---|---|---|
-| GET | `/requests/categories` | Signed in | – | Active categories (`id`, `name`, `description`, `is_blocker`). |
+| GET | `/requests/categories` | Candidate or staff | – | Active categories (`id`, `name`, `description`, `is_blocker`). |
 | GET | `/requests/staff` | Staff | – | Active support and admin users, used for assignment. |
-| GET | `/requests` | Signed in (candidates see only their own) | `q`, `status` (or `active`), `categoryId`, `priority`, `assigned` (`me`\|`unassigned`\|user id, staff only), `overdue`, `sort` (`created`\|`updated`\|`due`\|`priority`\|`reference`\|`status`), `order` (`asc`\|`desc`), `page`, `pageSize` (5–100) | `{ items[], total, page, pageSize, pages }` |
+| GET | `/requests` | Candidate or staff (candidates see only their own) | `q`, `status` (or `active`), `categoryId`, `priority`, `assigned` (`me`\|`unassigned`\|user id, staff only), `overdue`, `sort` (`created`\|`updated`\|`due`\|`priority`\|`reference`\|`status`), `order` (`asc`\|`desc`), `page`, `pageSize` (5–100) | `{ items[], total, page, pageSize, pages }` |
 | POST | `/requests` | Candidate | `title` (5–150), `description` (10–5000), `categoryId`, `priority` (`Low`\|`Medium`\|`High`\|`Urgent`, default `Medium`) | `201 { request, badges[] }`. Generates a reference such as `REQ-2026-0042` and calculates the SLA due date. |
 | GET | `/requests/:id` | Owner or staff | – | `{ request, messages[], allowedNext[], attachments[], rating }`. Internal notes, internal files and the candidate's e-mail and accessibility needs are only sent to staff. |
 | POST | `/requests/:id/attachments` | Owner or staff | `{ files: [{ name, data: "data:<mime>;base64,…" }], isInternal? }`. Up to 5 files of 5 MB each. | `201 { ids[] }`. The real file type is checked from the file contents, not the name. |
 | GET | `/requests/attachments/:id` | Owner or staff | – | The file, sent with `X-Content-Type-Options: nosniff` and a sandboxed CSP. Images are shown inline; other files download. |
 | POST | `/requests/:id/rating` | Candidate (owner) | `rating` (1–5), `comment?` | `{ ok, badges[] }`. Only allowed once the request is Resolved or Closed; can be updated. |
 
+## Recruiter workspace (`/recruiter`)
+
+Recruiter accounts are created or assigned by an administrator. A candidate's portfolio is private by default; only the candidate can edit it or publish it. Recruiter endpoints return candidate identity and portfolio details only while publication is enabled.
+
+| Method | Path | Access | Body / query | Response |
+|---|---|---|---|---|
+| GET | `/recruiter/me` | Candidate | – | The signed-in candidate's portfolio and projects, including private drafts. |
+| PATCH | `/recruiter/me` | Candidate | Optional `isPublished`, `headline`, `summary`, comma-separated `skills`, HTTPS `githubUrl`, HTTPS `cvUrl` | `{ portfolio }`. |
+| POST | `/recruiter/me/projects` | Candidate | `title`, optional `description`, HTTPS `projectUrl`, HTTPS `evidenceUrl` | `201 { project }`. |
+| DELETE | `/recruiter/me/projects/:projectId` | Project owner | – | `204`. |
+| GET | `/recruiter/summary` | Recruiter | – | Visible profile, work-ready, placed, and active-stream counts. |
+| GET | `/recruiter/talent` | Recruiter | Optional `q`, `stream`, `stage` | Published candidate rows and filter options. |
+| GET | `/recruiter/profiles/:id` | Recruiter | – | Published profile, verified programme requirements, and projects. Unpublished profiles return 404. |
+| GET | `/recruiter/portfolios` | Recruiter | – | Published profiles and project evidence. |
 ## 4. Workflow (`/workflow`): transaction-backed state machine
 
 | Method | Path | Access | Body | Response |
 |---|---|---|---|---|
-| GET | `/workflow/rules` | Signed in | – | Statuses, priorities, transitions (read from the `status_transitions` table) and the moves candidates are allowed to make. |
+| GET | `/workflow/rules` | Candidate or staff | – | Statuses, priorities, transitions (read from the `status_transitions` table) and the moves candidates are allowed to make. |
 | POST | `/workflow/requests/:id/transition` | Per role rules | `toStatus`, `note?` (internal), `message?` (sent to the candidate), `resolution?` (required for `Resolved`), `assigneeId?`, `override?` (admin only) | `{ request, allowedNext[], badges[] }` |
 | POST | `/workflow/requests/:id/assign` | Staff | `assigneeId`, `note?` | `{ request }`. Moves Open or Reopened requests to Assigned. |
 | POST | `/workflow/requests/:id/priority` | Staff | `priority`, `note?` | `{ request }`. Recalculates the SLA due date. |

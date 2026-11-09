@@ -46,7 +46,7 @@ router.post(
     firstName: NAME_RULE('First name'),
     surname: NAME_RULE('Surname'),
     email: { type: 'string', required: true, max: 254, pattern: EMAIL_RE, patternMessage: 'Enter a valid email address', label: 'Email' },
-    role: { type: 'enum', required: true, values: ['candidate', 'support', 'admin'] },
+    role: { type: 'enum', required: true, values: ['candidate', 'support', 'admin', 'recruiter'] },
     dateOfBirth: DOB_RULE,
     gender: { type: 'enum', values: ['female', 'male', 'non-binary', 'prefer-not'], default: 'prefer-not' },
     position: { type: 'string', max: 80 },
@@ -79,7 +79,7 @@ router.post('/users/:id/reset-password', idParam, async (req, res) => {
 router.patch(
   '/users/:id',
   idParam,
-  validate({ role: { type: 'enum', values: ['candidate', 'support', 'admin'] }, isActive: { type: 'bool' } }),
+  validate({ role: { type: 'enum', values: ['candidate', 'support', 'admin', 'recruiter'] }, isActive: { type: 'bool' } }),
   (req, res) => {
     const db = getDb();
     const { id } = req.params;

@@ -164,8 +164,10 @@ function notifications(db, user) {
   const { today } = birthdays(db, { withinDays: 0 });
   for (const b of today) {
     if (b.id === user.id) items.push({ type: 'birthday-self', tone: 'celebrate', title: `Happy birthday, ${b.firstName}!`, tkey: 'Happy birthday, {name}!', body: 'The whole CAPACITI team is celebrating you today.', bkey: 'The whole CAPACITI team is celebrating you today.', vars: { name: b.firstName }, href: user.role === 'candidate' ? '/dashboard' : null });
-    else if (b.role === 'candidate') items.push({ type: 'birthday', tone: 'celebrate', title: `It's ${b.firstName}'s birthday today`, tkey: "It's {name}'s birthday today", vars: { name: b.firstName }, body: b.cohort ? `${b.cohort}${b.stream ? ` · ${b.stream}` : ''}` : 'Send them some love!', href: null });
+    else if (b.role === 'candidate' && ['support', 'admin'].includes(user.role)) items.push({ type: 'birthday', tone: 'celebrate', title: `It's ${b.firstName}'s birthday today`, tkey: "It's {name}'s birthday today", vars: { name: b.firstName }, body: b.cohort ? `${b.cohort}${b.stream ? ` · ${b.stream}` : ''}` : 'Send them some love!', href: null });
   }
+
+  if (user.role === 'recruiter') return items;
 
   if (user.role === 'candidate') {
     const waiting = db.prepare("SELECT id, reference, title FROM requests WHERE candidate_id = ? AND status = 'Waiting for Candidate'").all(user.id);

@@ -49,6 +49,7 @@ const addUser = (name, email, role, dob, extra = {}) => {
 const admin = addUser('Nomsa Dlamini', 'admin@capaciti.org.za', 'admin', '1985-03-14', { position: 'Operations Lead', employeeId: 'CAP-0001', gender: 'female', avatar: { v: 2, art: 'polished', look: 'runway', skin: '7b4a2a', hair: 'bun', hairColor: '2c1b18', rearHair: 'none', facialHair: 'none', clothing: 'openJacket', clothesColor: '151613', bg: 'studio' } });
 const sup1 = addUser('Thabo Mokoena', 'thabo@capaciti.org.za', 'support', dobIn(21, 1992), { position: 'Programme Manager', employeeId: 'CAP-0142', gender: 'male' });
 const sup2 = addUser('Aisha Patel', 'aisha@capaciti.org.za', 'support', '1994-07-02', { position: 'Support Specialist', employeeId: 'CAP-0187', gender: 'female', avatar: { v: 2, art: 'polished', look: 'doll', skin: 'b98e6a', hair: 'sideComed', hairColor: '2c1b18', rearHair: 'longStraight', facialHair: 'none', clothing: 'turtleNeck', clothesColor: 'be185d', bg: 'sunset' } });
+addUser('Recruiter Demo', 'recruiter@capaciti.org.za', 'recruiter', '1988-04-15', { position: 'Talent Partner', employeeId: 'CAP-0301' });
 const team = { mentor: 'Thabo Mokoena', techChamp: 'Kyle Adams', supervisor: 'Aisha Patel' };
 const c1 = addUser('Lerato Khumalo', 'lerato@example.com', 'candidate', dobIn(9, 2001), { cohort: '2026 Cohort 1 · Cape Town', stream: 'Software Development', ...team, gender: 'female' });
 const c2 = addUser('Sipho Ndlovu', 'sipho@example.com', 'candidate', dobIn(0, 2002), { cohort: '2026 Cohort 1 · Johannesburg', stream: 'Data Science & Analytics', mentor: 'Aisha Patel', techChamp: 'Naledi Sithole', supervisor: 'Thabo Mokoena', gender: 'male', avatar: { v: 2, art: 'classic', look: 'tactical', skin: '614335', hair: 'shortFlat', hairColor: '2c1b18', hatColor: '4b5320', facialHair: 'beardLight', clothing: 'hoodie', clothesColor: '4b5320', graphic: 'skullOutline', accessory: 'wayfarers', accessoryColor: '151613', bg: 'camo' } });
@@ -141,8 +142,21 @@ function progress(candidate, upToMilestone, partialCount, startDaysAgo) {
   }
 }
 progress(c1, 3, 2, 120); // in training, 2/4 done
-progress(c2, 3, 1, 110);
-progress(c3, 4, 1, 150); // work ready, 1/3 done
+progress(c2, 4, 3, 110); // work-ready
+progress(c3, 5, 4, 150); // placed
+
+// These seeded demo profiles are explicitly published for the recruiter preview.
+const savePortfolio = db.prepare(`
+  INSERT INTO candidate_portfolios (candidate_id, is_published, headline, summary, skills)
+  VALUES (?, 1, ?, ?, ?)
+`);
+savePortfolio.run(c1.id, 'Software developer in training', 'Building accessible web applications and learning through practical projects.', JSON.stringify(['JavaScript', 'HTML', 'CSS', 'Accessibility']));
+savePortfolio.run(c2.id, 'Work-ready data analyst', 'Turns real-world questions into clear, useful data insights.', JSON.stringify(['Python', 'SQL', 'Data visualisation']));
+savePortfolio.run(c3.id, 'Cloud engineering graduate', 'Designs and deploys reliable cloud infrastructure and services.', JSON.stringify(['AWS', 'Linux', 'Docker', 'Networking']));
+const addPortfolioProject = db.prepare('INSERT INTO portfolio_items (candidate_id, title, description) VALUES (?, ?, ?)');
+addPortfolioProject.run(c1.id, 'Accessible support portal', 'A responsive portal prototype with keyboard-friendly forms and clear status updates.');
+addPortfolioProject.run(c2.id, 'Cohort attendance analysis', 'A data analysis project exploring attendance patterns and practical interventions.');
+addPortfolioProject.run(c3.id, 'Cloud deployment project', 'A containerised web service deployed with monitoring and a documented release workflow.');
 
 // ---- Engagement: XP, badges, ratings, feed -----------------------------------------
 const gamify = require('../modules/engage/gamification.service');
@@ -177,6 +191,7 @@ console.table([
   { role: 'admin', email: 'admin@capaciti.org.za' },
   { role: 'support', email: 'thabo@capaciti.org.za' },
   { role: 'support', email: 'aisha@capaciti.org.za' },
+  { role: 'recruiter', email: 'recruiter@capaciti.org.za' },
   { role: 'candidate', email: 'lerato@example.com' },
   { role: 'candidate', email: 'sipho@example.com' },
   { role: 'candidate', email: 'zanele@example.com' },

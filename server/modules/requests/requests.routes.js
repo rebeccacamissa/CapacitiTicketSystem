@@ -13,7 +13,7 @@ const { transaction } = require('../../db/connection');
 const { badRequest, notFound, conflict } = require('../../utils/AppError');
 
 const router = express.Router();
-router.use(authenticate);
+router.use(authenticate, authorize('candidate', 'support', 'admin'));
 
 router.get('/categories', (req, res) => {
   const rows = getDb().prepare('SELECT id, name, description, is_blocker FROM categories WHERE is_active = 1 ORDER BY name').all();

@@ -22,7 +22,7 @@ function announce(db, id, kind) {
 }
 
 const router = express.Router();
-router.use(authenticate);
+router.use(authenticate, authorize('candidate', 'support', 'admin'));
 
 const idParam = validate({ id: { type: 'int', required: true, min: 1 } }, 'params');
 

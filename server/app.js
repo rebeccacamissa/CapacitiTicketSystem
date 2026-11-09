@@ -37,6 +37,7 @@ function createApp() {
   app.use('/api/workflow', require('./modules/workflow/workflow.routes'));
   app.use('/api/analytics', require('./modules/analytics/analytics.routes'));
   app.use('/api/progress', require('./modules/progress/progress.routes'));
+  app.use('/api/recruiter', require('./modules/recruiter/recruiter.routes'));
   app.use('/api/admin', require('./modules/admin/admin.routes'));
   app.use('/api/cammy', require('./modules/cammy/cammy.routes'));
   app.use('/api/events', require('./realtime/realtime.routes'));
@@ -54,4 +55,3 @@ function createApp() {
 }
 
 module.exports = { createApp };
-

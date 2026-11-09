@@ -68,6 +68,82 @@ document.getElementById('role-details').innerHTML = p.candidate
      <p class="self-center text-xs text-white/45 sm:col-span-2">Programme details are maintained by your support team. Ask Cammy or raise a request if something is wrong.</p>`
   : `${item('Position', p.staff?.position)}${item('Employee ID', p.staff?.employeeId)}`;
 
+// ---- Recruiter portfolio sharing ------------------------------------------
+if (user.role === 'candidate') {
+  const section = document.getElementById('portfolio-sharing');
+  const portfolioForm = document.getElementById('portfolio-form');
+  const projectForm = document.getElementById('portfolio-project-form');
+  const projectsList = document.getElementById('portfolio-projects');
+  section.classList.remove('hidden');
+  let { portfolio } = await api('/recruiter/me');
+
+  function renderProjects() {
+    projectsList.innerHTML = portfolio.projects.map((project) => `
+      <li class="flex flex-wrap items-start gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+        <div class="min-w-0 flex-1"><p class="font-medium">${esc(project.title)}</p><p class="text-sm text-white/55">${esc(project.description || '')}</p>
+          <div class="mt-1 flex gap-3 text-xs">${project.projectUrl ? `<a class="text-salmon-50 hover:underline" href="${esc(project.projectUrl)}" target="_blank" rel="noopener noreferrer">Project</a>` : ''}
+            ${project.evidenceUrl ? `<a class="text-salmon-50 hover:underline" href="${esc(project.evidenceUrl)}" target="_blank" rel="noopener noreferrer">Evidence</a>` : ''}</div></div>
+        <button type="button" class="btn btn-ghost btn-sm" data-delete-project="${project.id}">Remove</button>
+      </li>`).join('') || '<li class="text-sm text-white/50">No projects added yet.</li>';
+  }
+
+  portfolioForm.elements.isPublished.checked = portfolio.isPublished;
+  portfolioForm.elements.headline.value = portfolio.headline || '';
+  portfolioForm.elements.summary.value = portfolio.summary || '';
+  portfolioForm.elements.skills.value = portfolio.skills.join(', ');
+  portfolioForm.elements.githubUrl.value = portfolio.githubUrl || '';
+  portfolioForm.elements.cvUrl.value = portfolio.cvUrl || '';
+  renderProjects();
+
+  portfolioForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const button = portfolioForm.querySelector('button');
+    setBusy(button, true, 'Saving…');
+    try {
+      ({ portfolio } = await api('/recruiter/me', { method: 'PATCH', body: {
+        isPublished: portfolioForm.elements.isPublished.checked,
+        headline: portfolioForm.elements.headline.value.trim(),
+        summary: portfolioForm.elements.summary.value.trim(),
+        skills: portfolioForm.elements.skills.value,
+        githubUrl: portfolioForm.elements.githubUrl.value.trim() || undefined,
+        cvUrl: portfolioForm.elements.cvUrl.value.trim() || undefined,
+      } }));
+      toast(portfolio.isPublished ? 'Portfolio shared with recruiters' : 'Portfolio made private', 'success');
+    } catch (err) { toast(err.message, 'error'); }
+    setBusy(button, false);
+  });
+
+  projectForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const button = projectForm.querySelector('button');
+    setBusy(button, true, 'Adding…');
+    try {
+      await api('/recruiter/me/projects', { method: 'POST', body: {
+        title: projectForm.elements.title.value.trim(),
+        description: projectForm.elements.description.value.trim(),
+        projectUrl: projectForm.elements.projectUrl.value.trim() || undefined,
+        evidenceUrl: projectForm.elements.evidenceUrl.value.trim() || undefined,
+      } });
+      ({ portfolio } = await api('/recruiter/me'));
+      renderProjects();
+      projectForm.reset();
+      toast('Project added', 'success');
+    } catch (err) { toast(err.message, 'error'); }
+    setBusy(button, false);
+  });
+
+  projectsList.addEventListener('click', async (e) => {
+    const button = e.target.closest('[data-delete-project]');
+    if (!button) return;
+    try {
+      await api(`/recruiter/me/projects/${button.dataset.deleteProject}`, { method: 'DELETE' });
+      ({ portfolio } = await api('/recruiter/me'));
+      renderProjects();
+      toast('Project removed', 'success');
+    } catch (err) { toast(err.message, 'error'); }
+  });
+}
+
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   const btn = form.querySelector('button');

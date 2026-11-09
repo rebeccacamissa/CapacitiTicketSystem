@@ -12,7 +12,7 @@ const { tr } = require('../../i18n');
 const norm = (s) => s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9\s']/g, ' ').replace(/\s+/g, ' ').trim();
 const has = (text, words) => words.some((w) => (w.includes(' ') ? text.includes(w) : new RegExp(`\\b${w}`).test(text)));
 
-const HOME = { candidate: '/dashboard', support: '/insights', admin: '/admin' };
+const HOME = { candidate: '/dashboard', support: '/insights', admin: '/admin', recruiter: '/recruiter' };
 
 const KW = {
   greet: /^(hi|hello|hey|hiya|howzit|yo|sawubona|sanibonani|molo|molweni|hallo|haai|dumela|dumelang|thobela|good (morning|afternoon|evening)|goeie(more| more|middag|naand))\b/,
@@ -56,6 +56,7 @@ const SUGGEST = {
   candidate: ['Show me around', 'Where am I on my journey?', 'Check my requests', 'Accessibility options', 'Who is my mentor?', 'I need help with data'],
   support: ['Show me around', 'What is in my queue?', 'Explain the workflow', 'How do I update a candidate?', 'Accessibility options'],
   admin: ['Show me around', 'How do I add a user?', 'Show unassigned tickets', 'Explain the workflow', 'Accessibility options'],
+  recruiter: ['Show me around', 'Find work-ready talent', 'Browse candidate profiles', 'View shared portfolios', 'Accessibility options'],
 };
 
 function reply(db, user, rawMessage) {
@@ -110,20 +111,38 @@ function reply(db, user, rawMessage) {
   }
 
   if (has(text, KW.feed)) {
+    if (user.role === 'recruiter') return out(T('Candidate projects and supporting evidence are available from the portfolios shared with your recruiter account.'), [act('Browse portfolios', '/portfolios')]);
     return out(T('The **Cohort feed** shows announcements from your programme team, milestone celebrations, new badges and birthdays. React to posts to cheer people on.'), [act('Open the feed', '/feed')]);
   }
 
   if (has(text, KW.palette)) {
+    if (user.role === 'recruiter') return out(T('Search published candidate talent by name, email or skills on the talent board.'), [act('Explore talent board', '/talent-board')]);
     return out(T('Press **Ctrl + K** (or **Cmd + K** on a Mac) anywhere to search requests, jump to pages and run quick actions. Press **?** to see every keyboard shortcut.'), [], { command: { type: 'palette' } });
   }
 
   if (has(text, KW.nav)) {
-    return out(T('Each role has its own home:\n• **Candidate**: Dashboard (journey, tickets, birthday, profile)\n• **Support / Manager**: Support dashboard (queue, workload, candidates)\n• **Admin**: Control centre (users, roles, categories, analytics)\n\nUse the menu to move around. In demo mode, the **View as** switcher in the top bar jumps between roles.'),
+    return out(T('Each role has its own home:\n• **Candidate**: Dashboard (journey, tickets, birthday, profile)\n• **Support / Manager**: Support dashboard (queue, workload, candidates)\n• **Admin**: Control centre (users, roles, categories, analytics)\n• **Recruiter**: Talent board, candidate profiles and published portfolios\n\nUse the menu to move around. In demo mode, the **Preview as** switcher in the top bar jumps between roles.'),
       [act('Go to my home', HOME[user.role])]);
   }
 
   if (has(text, KW.workflow) && !has(text, ['my request', 'my ticket', 'check'])) {
     return out(T("Every request moves through these steps:\n**Open**, **Assigned**, **In Progress**, then **Waiting for Candidate** while we need information from you, **Resolved** and **Closed**.\nIf a fix didn't work, a resolved or closed request can be **Reopened**. The system blocks skipped steps, so nothing gets lost."));
+  }
+
+  if (user.role === 'recruiter') {
+    if (has(text, ['talent', 'search', 'work ready', 'work-ready', 'stream'])) {
+      return out(T('The **Talent board** searches published candidate portfolios by name, email or skills, and filters by stream and programme stage.'), [act('Explore talent board', '/talent-board')]);
+    }
+    if (has(text, ['profile', 'credential', 'candidate'])) {
+      return out(T('Candidate profiles include only information candidates chose to share, plus their verified programme credentials.'), [act('Browse candidate profiles', '/candidate-profiles')]);
+    }
+    if (has(text, ['portfolio', 'project', 'github', 'cv', 'evidence'])) {
+      return out(T('The **Portfolios** page collects published student projects, evidence, GitHub links and CV documents.'), [act('Browse portfolios', '/portfolios')]);
+    }
+    return out(T("I can help you explore candidate information that has been shared with recruiters. I can't access support tickets or private candidate profiles."), [
+      act('Open recruiter overview', '/recruiter'),
+      act('Explore talent board', '/talent-board'),
+    ]);
   }
 
   if (user.role === 'candidate') {

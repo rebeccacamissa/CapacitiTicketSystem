@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Talent board · CAPACITI Support</title>
+  <link rel="icon" href="/assets/logo-mark.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <main id="main" class="opacity-0 space-y-6" data-title="Talent board" data-subtitle="Recruiter workspace">
+    <section class="card">
+      <div class="grid gap-3 md:grid-cols-[1fr_14rem_14rem]">
+        <div><label for="talent-search" class="field-label">Search names, email, skills</label><input id="talent-search" class="field" type="search" placeholder="Search names, email, skills"></div>
+        <div><label for="stream-filter" class="field-label">Stream</label><select id="stream-filter" class="field"><option value="">All streams</option></select></div>
+        <div><label for="stage-filter" class="field-label">Stage</label><select id="stage-filter" class="field"><option value="">All stages</option></select></div>
+      </div>
+    </section>
+    <section class="card overflow-hidden p-0" aria-label="Shared candidate portfolios">
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[42rem] text-left text-sm">
+          <thead class="border-b border-white/10 bg-white/[0.03] text-[0.65rem] font-semibold tracking-wider text-white/45 uppercase">
+            <tr><th class="px-5 py-3">Candidate</th><th class="px-5 py-3">Stream</th><th class="px-5 py-3">Stage</th><th class="px-5 py-3">Portfolio</th></tr>
+          </thead>
+          <tbody id="talent-rows" class="divide-y divide-white/[0.06]"><tr><td colspan="4" class="p-8 text-center text-white/50">Loading shared portfolios…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="/js/pages/talent-board.js"></script>
+</body>
+</html>

@@ -72,7 +72,12 @@ router.post(
 );
 
 // ---- Demo role switcher (DEMO_MODE=true, never in production) -------------------
-const DEMO_EMAILS = { candidate: 'lerato@example.com', support: 'thabo@capaciti.org.za', admin: 'admin@capaciti.org.za' };
+const DEMO_EMAILS = {
+  candidate: 'lerato@example.com',
+  support: 'thabo@capaciti.org.za',
+  admin: 'admin@capaciti.org.za',
+  recruiter: 'recruiter@capaciti.org.za',
+};
 
 router.get('/demo-accounts', (req, res) => {
   if (!demoMode) return res.json({ enabled: false, accounts: [] });
@@ -81,7 +86,7 @@ router.get('/demo-accounts', (req, res) => {
   res.json({ enabled: true, accounts: rows.map((r) => ({ role: r.role, name: r.full_name })) });
 });
 
-router.post('/demo-login', validate({ role: { type: 'enum', required: true, values: ['candidate', 'support', 'admin'] } }), (req, res) => {
+router.post('/demo-login', validate({ role: { type: 'enum', required: true, values: Object.keys(DEMO_EMAILS) } }), (req, res) => {
   if (!demoMode) throw notFound();
   const u = getDb().prepare('SELECT * FROM users WHERE email = ? AND is_active = 1').get(DEMO_EMAILS[req.body.role]);
   if (!u) throw notFound('Demo account not found — run npm run db:reset');

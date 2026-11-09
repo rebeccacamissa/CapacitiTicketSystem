@@ -94,7 +94,7 @@ router.post('/profile/tour', validate({ done: { type: 'bool', default: true } })
 });
 
 // ---- Command palette search ---------------------------------------------------
-router.get('/search', validate({ q: { type: 'string', required: true, min: 1, max: 80 } }, 'query'), (req, res) => {
+router.get('/search', authorize('candidate', 'support', 'admin'), validate({ q: { type: 'string', required: true, min: 1, max: 80 } }, 'query'), (req, res) => {
   const db = getDb();
   const like = `%${req.validQuery.q.replace(/[%_\\]/g, (m) => `\\${m}`)}%`;
   const own = req.user.role === 'candidate';
@@ -113,7 +113,7 @@ router.get('/search', validate({ q: { type: 'string', required: true, min: 1, ma
 });
 
 // ---- Cohort feed -------------------------------------------------------------
-router.get('/feed', validate({ limit: { type: 'int', min: 1, max: 50 }, before: { type: 'int', min: 1 } }, 'query'), (req, res) => {
+router.get('/feed', authorize('candidate', 'support', 'admin'), validate({ limit: { type: 'int', min: 1, max: 50 }, before: { type: 'int', min: 1 } }, 'query'), (req, res) => {
   res.json({ posts: feed.list(getDb(), req.user, req.validQuery) });
 });
 
@@ -131,6 +131,7 @@ router.post(
 
 router.post(
   '/feed/:id/react',
+  authorize('candidate', 'support', 'admin'),
   validate({ id: { type: 'int', required: true, min: 1 } }, 'params'),
   validate({ reaction: { type: 'enum', required: true, values: feed.REACTIONS } }),
   (req, res) => res.json(feed.react(getDb(), req.user, req.params.id, req.body.reaction))

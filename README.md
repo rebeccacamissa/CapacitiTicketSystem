@@ -28,6 +28,7 @@ CAPACITI candidates raise support needs (connectivity, platform access, attendan
 | **Requests** | Automatic `REQ-2026-0001` references, SLA due dates by priority, search, filters, sorting, pagination, attachments with real file-type checks, internal notes, and 1–5 star satisfaction ratings |
 | **Candidate journey** | Animated 5-milestone roadmap (Screening → Onboarding → Training → Work Ready → Internship) with requirement tracking and alerts when open support cases may affect progress |
 | **Dashboards** | Support dashboard (queue, workload, 14-day trend, category and priority breakdowns, overdue cases, satisfaction) and admin control centre |
+| **Recruiter workspace** | Opt-in talent board, candidate profiles with verified programme credentials, and published project portfolios; recruiters cannot access support tickets |
 | **Live** | Server-Sent Events: tickets, notifications, roadmaps and the feed update without a refresh |
 | **Cammy** | An assistant that wears each user's avatar, has 7 moods, gives role-specific first-sign-in walkthroughs and answers from live data in 5 languages |
 | **Avatars** | Avatar studio with two art styles (Polished and the inclusive Classic), four looks, and badge-unlocked items |

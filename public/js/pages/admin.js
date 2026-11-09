@@ -9,7 +9,7 @@ const options = await api('/meta/options');
 let users = [];
 let roleFilter = 'all';
 
-const ROLE_STYLE = { candidate: 'bg-purple/25 text-purple-30', support: 'bg-salmon/20 text-salmon-50', admin: 'bg-white/15 text-white' };
+const ROLE_STYLE = { candidate: 'bg-purple/25 text-purple-30', support: 'bg-salmon/20 text-salmon-50', admin: 'bg-white/15 text-white', recruiter: 'bg-ok/15 text-ok' };
 
 // ---- KPIs ---------------------------------------------------------------------
 async function loadKpis() {
@@ -29,7 +29,7 @@ async function loadKpis() {
 
 // ---- Users ------------------------------------------------------------------
 const filterEl = document.getElementById('role-filter');
-filterEl.innerHTML = [['all', 'All'], ['candidate', 'Candidates'], ['support', 'Support'], ['admin', 'Admins']].map(([v, l]) =>
+filterEl.innerHTML = [['all', 'All'], ['candidate', 'Candidates'], ['support', 'Support'], ['admin', 'Admins'], ['recruiter', 'Recruiters']].map(([v, l]) =>
   `<button type="button" data-filter="${v}" aria-pressed="${v === roleFilter}" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-white/60 transition hover:text-white aria-pressed:bg-white/15 aria-pressed:text-white">${l}</button>`).join('');
 filterEl.addEventListener('click', (e) => {
   const b = e.target.closest('[data-filter]');
@@ -54,7 +54,7 @@ function renderUsers() {
         <div class="min-w-0"><p class="truncate font-medium">${esc(u.full_name)}${u.id === me.id ? ' <span class="text-xs text-white/40">(you)</span>' : ''}</p><p class="truncate text-xs text-white/50">${esc(u.email)}</p></div></div></td>
       <td><label class="sr-only" for="role-${u.id}">Role for ${esc(u.full_name)}</label>
         <select id="role-${u.id}" data-role="${u.id}" class="field !w-44 !py-1.5 !text-xs" ${u.id === me.id ? 'disabled' : ''}>
-          ${['candidate', 'support', 'admin'].map((r) => `<option value="${r}" ${r === u.role ? 'selected' : ''}>${ROLE_LABEL[r]}</option>`).join('')}
+          ${['candidate', 'support', 'admin', 'recruiter'].map((r) => `<option value="${r}" ${r === u.role ? 'selected' : ''}>${ROLE_LABEL[r]}</option>`).join('')}
         </select></td>
       <td class="text-xs text-white/65">${u.role === 'candidate'
         ? `${esc(u.stream || '—')}<span class="block text-white/40">${esc(u.cohort || '')} · ${u.requests_raised} request(s)</span>`

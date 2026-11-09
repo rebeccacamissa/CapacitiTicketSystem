@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
   email          TEXT    NOT NULL UNIQUE COLLATE NOCASE,
   password_hash  TEXT    NOT NULL,
   role           TEXT    NOT NULL DEFAULT 'candidate'
-                         CHECK (role IN ('candidate', 'support', 'admin')),
+                         CHECK (role IN ('candidate', 'support', 'admin', 'recruiter')),
   is_active      INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
   first_name     TEXT,
   surname        TEXT,
@@ -49,6 +49,28 @@ CREATE TABLE IF NOT EXISTS candidate_profiles (
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_by  INTEGER REFERENCES users(id) ON DELETE SET NULL
 );
+
+CREATE TABLE IF NOT EXISTS candidate_portfolios (
+  candidate_id  INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  is_published  INTEGER NOT NULL DEFAULT 0 CHECK (is_published IN (0, 1)),
+  headline      TEXT NOT NULL DEFAULT '',
+  summary       TEXT NOT NULL DEFAULT '',
+  skills        TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(skills)),
+  github_url    TEXT,
+  cv_url        TEXT,
+  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE TABLE IF NOT EXISTS portfolio_items (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  candidate_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title         TEXT NOT NULL CHECK (length(trim(title)) BETWEEN 1 AND 120),
+  description   TEXT NOT NULL DEFAULT '' CHECK (length(description) <= 1000),
+  project_url   TEXT,
+  evidence_url  TEXT,
+  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_portfolio_items_candidate ON portfolio_items(candidate_id);
 
 CREATE TABLE IF NOT EXISTS staff_profiles (
   user_id      INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
