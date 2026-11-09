@@ -44,8 +44,15 @@ const STEPS = {
     { el: 'recruiter-kpis', title: 'Your talent pool', body: 'See how many profiles are visible, who is work ready or placed, and how many streams are active.' },
     ...COMMON_END,
   ],
+  facilitator: [
+    ...COMMON_START,
+    { el: 'fac-kpis', title: 'Your streams at a glance', body: 'Candidates in your streams, who is waiting for a stage review, and who is work ready.' },
+    { el: 'fac-review', title: 'Ready for review', body: 'These candidates have every exit criterion evidenced. Open one to approve their next stage, with a reason.' },
+    { el: 'fac-list', title: 'Every candidate in your streams', body: 'Official stage and evidence progress for each candidate. Stages move one step at a time, and every decision is recorded.' },
+    ...COMMON_END,
+  ],
 };
-const HOME = { candidate: '/dashboard', support: '/insights', admin: '/admin', recruiter: '/recruiter' };
+const HOME = { candidate: '/dashboard', support: '/insights', admin: '/admin', recruiter: '/recruiter', facilitator: '/facilitator' };
 
 let running = false;
 

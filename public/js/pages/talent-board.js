@@ -1,6 +1,8 @@
 import { api } from '../api.js';
 import { initPage } from '../layout.js';
 import { esc, toast } from '../ui.js';
+import { shortlistButton, wireShortlist } from '../components/shortlist.js';
+import { stageBadge } from '../components/stage-ui.js';
 
 await initPage({ roles: ['recruiter'] });
 const search = document.getElementById('talent-search');
@@ -26,8 +28,8 @@ async function loadTalent() {
       <tr class="transition hover:bg-white/[0.03]">
         <td class="px-5 py-4"><p class="font-medium">${esc(candidate.fullName)}</p><p class="text-xs text-white/50">${esc(candidate.email)}</p></td>
         <td class="px-5 py-4 text-white/70">${esc(candidate.stream || '—')}</td>
-        <td class="px-5 py-4"><span class="chip">${esc(candidate.stageLabel)}</span></td>
-        <td class="px-5 py-4"><a class="text-sm font-semibold text-salmon-50 hover:underline" href="/candidate-profiles?id=${candidate.id}">View portfolio →</a></td>
+        <td class="px-5 py-4">${stageBadge(candidate.stage, candidate.stageLabel)}</td>
+        <td class="px-5 py-4"><span class="flex items-center gap-3"><a class="text-sm font-semibold text-salmon-50 hover:underline" href="/candidate-profiles?id=${candidate.id}">View portfolio →</a>${shortlistButton(candidate, { label: false })}</span></td>
       </tr>`).join('') : '<tr><td colspan="4" class="px-5 py-12 text-center text-white/55">No shared candidate portfolios yet</td></tr>';
   } catch (error) {
     if (currentRequest === requestId) {
@@ -44,4 +46,5 @@ search.addEventListener('input', () => {
 });
 streamFilter.addEventListener('change', loadTalent);
 stageFilter.addEventListener('change', loadTalent);
+wireShortlist(rows, loadTalent);
 await loadTalent();

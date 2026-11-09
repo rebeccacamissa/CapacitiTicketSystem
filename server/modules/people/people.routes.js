@@ -6,6 +6,7 @@ const { validate, DOB_RULE } = require('../../middleware/validate');
 const options = require('../../config/options');
 const svc = require('./people.service');
 const { avatarOf } = require('../avatar/catalog');
+const rules = require('../stages/stage.rules');
 
 const router = express.Router();
 
@@ -38,25 +39,29 @@ router.patch(
 );
 
 // ---- Birthdays & notifications ----------------------------------------------
-router.get('/people/birthdays', authorize('candidate', 'support', 'admin'), (req, res) => res.json(svc.birthdays(getDb())));
+router.get('/people/birthdays', authorize('candidate', 'support', 'admin', 'facilitator'), (req, res) => res.json(svc.birthdays(getDb())));
 router.get('/notifications', (req, res) => res.json({ items: svc.notifications(getDb(), req.user) }));
 
 // ---- Candidate information (managers / support) ------------------------------
-router.get('/candidates', authorize('support', 'admin'), (req, res) => {
+router.get('/candidates', authorize('support', 'admin', 'facilitator'), (req, res) => {
+  const scope = rules.scopeSql(getDb(), req.user);
   const rows = getDb().prepare(`
     SELECT u.id, u.full_name, u.email, u.gender, u.avatar_config, u.accessibility, cp.cohort, cp.stream, cp.mentor, cp.supervisor,
       (SELECT COUNT(*) FROM requests r WHERE r.candidate_id = u.id AND r.status NOT IN ('Resolved','Closed')) AS open_requests
     FROM users u LEFT JOIN candidate_profiles cp ON cp.user_id = u.id
-    WHERE u.role = 'candidate' AND u.is_active = 1 ORDER BY u.full_name
-  `).all();
+    WHERE u.role = 'candidate' AND u.is_active = 1 AND ${scope.sql} ORDER BY u.full_name
+  `).all(...scope.params);
   res.json({ candidates: rows.map(({ avatar_config, accessibility, ...r }) => ({ ...r, avatar: avatarOf({ avatar_config, gender: r.gender }), accessibility: JSON.parse(accessibility || '{}') })) });
 });
 
 router.get(
   '/candidates/:id',
-  authorize('support', 'admin'),
+  authorize('support', 'admin', 'facilitator'),
   validate({ id: { type: 'int', required: true, min: 1 } }, 'params'),
-  (req, res) => res.json({ profile: svc.getProfile(getDb(), req.params.id) })
+  (req, res) => {
+    rules.assertCanSeeCandidate(getDb(), req.user, req.params.id);
+    res.json({ profile: svc.getProfile(getDb(), req.params.id) });
+  }
 );
 
 router.patch(

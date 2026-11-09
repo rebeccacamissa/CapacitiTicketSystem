@@ -97,7 +97,7 @@ export function createRoadmap(root, { editable = false, onToggleRequirement, hea
     const m = data.milestones[flyoutIndex];
     const done = m.requirements.filter((r) => r.completed);
     const remaining = m.requirements.filter((r) => !r.completed);
-    const pct = Math.round((m.completedCount / m.totalCount) * 100);
+    const pct = m.totalCount ? Math.round((m.completedCount / m.totalCount) * 100) : (m.state === 'completed' ? 100 : 0);
     const isCurrent = m.state === 'current';
     const blockers = isCurrent ? data.blockers : [];
 
@@ -120,7 +120,7 @@ export function createRoadmap(root, { editable = false, onToggleRequirement, hea
         <div class="mx-auto mb-3 h-1.5 w-12 rounded-full bg-white/30 md:hidden" aria-hidden="true"></div>
         <div class="flex items-start justify-between gap-4">
           <div>
-            <p class="text-xs font-semibold tracking-wider text-white/60 uppercase">${t('Milestone {n} of {total}', { n: flyoutIndex + 1, total: data.milestones.length })}</p>
+            <p class="text-xs font-semibold tracking-wider text-white/60 uppercase">${t('Stage {n} of {total}', { n: flyoutIndex + 1, total: data.milestones.length })}</p>
             <h3 id="rm-fly-title" class="mt-1 text-xl">${esc(m.title)}</h3>
             <span class="badge mt-2 ${STATE_BADGE[m.state]}">${STATE_LABEL[m.state]}</span>
           </div>
@@ -134,7 +134,7 @@ export function createRoadmap(root, { editable = false, onToggleRequirement, hea
 
         <div>
           <div class="flex items-baseline justify-between text-sm">
-            <span class="font-medium">${t('{done} of {total} requirements', { done: m.completedCount, total: m.totalCount })}</span>
+            <span class="font-medium">${m.totalCount ? t('{done} of {total} exit criteria evidenced', { done: m.completedCount, total: m.totalCount }) : t('No checklist for this stage')}</span>
             <span class="text-white/60">${pct}%</span>
           </div>
           <div class="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
@@ -146,6 +146,10 @@ export function createRoadmap(root, { editable = false, onToggleRequirement, hea
           <div class="rounded-xl bg-white/5 p-3"><dt class="text-xs text-white/60">Started</dt><dd class="mt-0.5 font-semibold">${fmtDate(m.startedAt)}</dd></div>
           <div class="rounded-xl bg-white/5 p-3"><dt class="text-xs text-white/60">Achieved</dt><dd class="mt-0.5 font-semibold">${m.achievedAt ? fmtDate(m.achievedAt) : m.state === 'current' ? 'In progress' : 'Not yet'}</dd></div>
         </dl>
+
+        ${m.decision ? `<div class="rounded-xl border border-purple/30 bg-purple/10 p-3 text-sm"><p class="text-xs font-semibold tracking-wide text-purple-30 uppercase">${t('Official stage decision')}</p>
+          <p class="mt-1">${t('Approved by {name} on {date}', { name: esc(m.decision.by), date: fmtDate(m.decision.at) })}</p><p class="mt-1 text-xs text-white/65" translate="no">${esc(m.decision.reason)}</p></div>` : ''}
+        ${isCurrent && data.readyForReview ? `<p class="rounded-xl border border-ok/30 bg-ok/10 p-3 text-sm font-medium text-ok" role="status">${t('Every exit criterion is evidenced. Waiting for a facilitator to approve the next stage.')}</p>` : ''}
 
         ${blockers.length ? `
           <div class="rounded-xl border border-warn/30 bg-warn/10 p-4" role="note">
@@ -161,12 +165,12 @@ export function createRoadmap(root, { editable = false, onToggleRequirement, hea
           </div>` : ''}
 
         ${editable ? `
-          <section><h4 class="text-sm font-semibold">Requirements</h4>
-            <p class="text-xs text-white/60">Tick to verify a requirement for this candidate.</p>
+          <section><h4 class="text-sm font-semibold">Exit criteria (supporting evidence)</h4>
+            <p class="text-xs text-white/60">Tick to verify evidence. Evidence never changes the official stage: a facilitator approves that separately.</p>
             <ul class="mt-2 space-y-1">${m.requirements.map(reqItem).join('')}</ul></section>` : `
           ${done.length ? `<section><h4 class="text-sm font-semibold">What you've completed</h4><ul class="mt-1 divide-y divide-white/10">${done.map(reqItem).join('')}</ul></section>` : ''}
           ${remaining.length ? `<section><h4 class="text-sm font-semibold">Remaining requirements</h4><ul class="mt-1 divide-y divide-white/10">${remaining.map(reqItem).join('')}</ul></section>`
-            : '<p class="rounded-xl bg-purple/20 p-4 text-sm font-medium text-purple-30">Every requirement for this milestone is complete.</p>'}`}
+            : m.totalCount ? '<p class="rounded-xl bg-purple/20 p-4 text-sm font-medium text-purple-30">Every exit criterion for this stage is evidenced.</p>' : ''}`}
       </div>`;
   }
 
@@ -177,7 +181,7 @@ export function createRoadmap(root, { editable = false, onToggleRequirement, hea
 
     track.innerHTML = milestones.map((m, i) => {
       const last = i === milestones.length - 1;
-      const fill = i < activeIndex ? 1 : i === activeIndex && !allComplete ? m.completedCount / m.totalCount : 0;
+      const fill = i < activeIndex ? 1 : i === activeIndex && !allComplete && m.totalCount ? m.completedCount / m.totalCount : 0;
       const nodeStyle = m.state === 'completed'
         ? 'bg-purple text-white shadow-md shadow-purple/30 hover:scale-110'
         : m.state === 'current'
@@ -199,7 +203,7 @@ export function createRoadmap(root, { editable = false, onToggleRequirement, hea
           <div class="pt-1 md:mt-4 md:max-w-[11rem] md:px-2 md:pt-0">
             <p class="text-sm font-semibold leading-snug ${m.state === 'upcoming' ? 'text-white/60' : 'text-white'}">${esc(m.title)}</p>
             <p class="mt-1 text-xs text-white/60">
-              ${m.state === 'completed' ? t('Achieved {date}', { date: fmtDate(m.achievedAt) }) : m.state === 'current' ? t('{done}/{total} requirements done', { done: m.completedCount, total: m.totalCount }) : t('Upcoming')}
+              ${m.state === 'completed' ? t('Achieved {date}', { date: fmtDate(m.achievedAt) }) : m.state === 'current' ? (m.totalCount ? t('{done}/{total} evidence items', { done: m.completedCount, total: m.totalCount }) : t('Current stage')) : t('Upcoming')}
             </p>
             ${m.state === 'current' && hasBlockers ? `
               <span class="badge mt-2 bg-warn/15 text-warn"><span class="h-1.5 w-1.5 rounded-full bg-amber-glow animate-pulse" aria-hidden="true"></span>Support active</span>` : ''}
@@ -217,7 +221,7 @@ export function createRoadmap(root, { editable = false, onToggleRequirement, hea
       <span class="absolute inset-0 rounded-full ${hasBlockers ? 'bg-amber-glow' : 'bg-salmon'} animate-ring-pulse"></span>
       <span class="absolute inset-0 rounded-full ${hasBlockers ? 'bg-amber-glow' : 'bg-salmon'} animate-ring-pulse [animation-delay:1.1s]"></span>
       <span class="absolute -top-9 left-1/2 hidden -translate-x-1/2 animate-float whitespace-nowrap rounded-full bg-snow px-2.5 py-1 text-[0.65rem] font-semibold tracking-wide text-kadet shadow md:block">
-        ${allComplete ? 'Placed!' : 'You are here'}
+        ${allComplete ? 'Completed!' : 'You are here'}
         <span class="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-snow"></span>
       </span>
       <span class="relative block h-14 w-14 overflow-hidden rounded-full bg-gradient-to-br from-salmon to-purple shadow-lg ring-4 ring-night ${hasBlockers ? 'animate-amber-pulse' : ''}">
@@ -270,8 +274,8 @@ export function createRoadmap(root, { editable = false, onToggleRequirement, hea
     const { milestones, activeIndex, blockers, percentComplete, allComplete } = data;
     const current = milestones[activeIndex];
     $('[data-rm-sub]').textContent = allComplete
-      ? 'Congratulations — you have completed every programme milestone.'
-      : t('Currently: {title} · step {n} of {total}', { title: t(current.title), n: activeIndex + 1, total: milestones.length });
+      ? t('Official stage: Completed. Congratulations on completing the programme.')
+      : `${t('Official stage: {title} · step {n} of {total}', { title: t(current.title), n: activeIndex + 1, total: milestones.length })}${data.readyForReview ? ` · ${t('Ready for review')}` : ''}`;
     $('[data-rm-pct]').textContent = `${percentComplete}%`;
     requestAnimationFrame(() => { $('[data-rm-bar]').style.width = `${percentComplete}%`; });
 
@@ -293,7 +297,7 @@ export function createRoadmap(root, { editable = false, onToggleRequirement, hea
       render();
       if (flyoutIndex !== null) renderFlyout();
       if (moved) {
-        $('[data-rm-live]').textContent = `Progress updated: you are now at ${next.milestones[next.activeIndex].title}.`;
+        $('[data-rm-live]').textContent = `Official stage updated: you are now at ${next.milestones[next.activeIndex].title}.`;
       }
     },
   };

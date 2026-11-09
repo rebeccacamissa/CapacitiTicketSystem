@@ -31,3 +31,6 @@ services:
         value: "true"
       - key: ALLOW_DEMO_IN_PRODUCTION
         value: "true"
+      # Optional: enables AI CV tailoring. Set the value in the Render dashboard (never commit it).
+      - key: ANTHROPIC_API_KEY
+        sync: false

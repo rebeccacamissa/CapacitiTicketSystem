@@ -113,7 +113,7 @@ router.get('/search', authorize('candidate', 'support', 'admin'), validate({ q: 
 });
 
 // ---- Cohort feed -------------------------------------------------------------
-router.get('/feed', authorize('candidate', 'support', 'admin'), validate({ limit: { type: 'int', min: 1, max: 50 }, before: { type: 'int', min: 1 } }, 'query'), (req, res) => {
+router.get('/feed', authorize('candidate', 'support', 'admin', 'facilitator'), validate({ limit: { type: 'int', min: 1, max: 50 }, before: { type: 'int', min: 1 } }, 'query'), (req, res) => {
   res.json({ posts: feed.list(getDb(), req.user, req.validQuery) });
 });
 
@@ -131,7 +131,7 @@ router.post(
 
 router.post(
   '/feed/:id/react',
-  authorize('candidate', 'support', 'admin'),
+  authorize('candidate', 'support', 'admin', 'facilitator'),
   validate({ id: { type: 'int', required: true, min: 1 } }, 'params'),
   validate({ reaction: { type: 'enum', required: true, values: feed.REACTIONS } }),
   (req, res) => res.json(feed.react(getDb(), req.user, req.params.id, req.body.reaction))

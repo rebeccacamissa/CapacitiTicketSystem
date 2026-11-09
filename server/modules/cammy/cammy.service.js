@@ -12,7 +12,7 @@ const { tr } = require('../../i18n');
 const norm = (s) => s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9\s']/g, ' ').replace(/\s+/g, ' ').trim();
 const has = (text, words) => words.some((w) => (w.includes(' ') ? text.includes(w) : new RegExp(`\\b${w}`).test(text)));
 
-const HOME = { candidate: '/dashboard', support: '/insights', admin: '/admin', recruiter: '/recruiter' };
+const HOME = { candidate: '/dashboard', support: '/insights', admin: '/admin', recruiter: '/recruiter', facilitator: '/facilitator' };
 
 const KW = {
   greet: /^(hi|hello|hey|hiya|howzit|yo|sawubona|sanibonani|molo|molweni|hallo|haai|dumela|dumelang|thobela|good (morning|afternoon|evening)|goeie(more| more|middag|naand))\b/,
@@ -57,6 +57,7 @@ const SUGGEST = {
   support: ['Show me around', 'What is in my queue?', 'Explain the workflow', 'How do I update a candidate?', 'Accessibility options'],
   admin: ['Show me around', 'How do I add a user?', 'Show unassigned tickets', 'Explain the workflow', 'Accessibility options'],
   recruiter: ['Show me around', 'Find work-ready talent', 'Browse candidate profiles', 'View shared portfolios', 'Accessibility options'],
+  facilitator: ['Show me around', 'Who is ready for review?', 'How do stage decisions work?', 'Accessibility options'],
 };
 
 function reply(db, user, rawMessage) {
@@ -129,6 +130,16 @@ function reply(db, user, rawMessage) {
     return out(T("Every request moves through these steps:\n**Open**, **Assigned**, **In Progress**, then **Waiting for Candidate** while we need information from you, **Resolved** and **Closed**.\nIf a fix didn't work, a resolved or closed request can be **Reopened**. The system blocks skipped steps, so nothing gets lost."));
   }
 
+  if (user.role === 'facilitator') {
+    if (has(text, ['ready', 'review', 'waiting', 'approve'])) {
+      const ready = require('../stages/stage.service').candidates(db, user).filter((c) => c.readyForReview);
+      if (!ready.length) return out(T('Nobody in your streams is ready for a stage review yet.'), [act('Open stage approvals', '/stage-decisions')]);
+      const lines = ready.map((c) => `• **${c.fullName}**: ${T(c.stageLabel)} → ${T(c.nextStage.label)}`);
+      return out(`${T('Ready for a stage review: {n}', { n: ready.length })}\n${lines.join('\n')}`, [act('Open stage approvals', '/stage-decisions')]);
+    }
+    return out(T('Stage decisions move a candidate one step at a time: Enrolled, In Training, Work Ready, Placed, Completed. You approve forward steps for candidates in your streams, with a reason. Only an administrator can move someone back. Every decision is recorded in the stage audit trail.'), [act('Open stage approvals', '/stage-decisions'), act('Candidate evidence', '/candidates')]);
+  }
+
   if (user.role === 'recruiter') {
     if (has(text, ['talent', 'search', 'work ready', 'work-ready', 'stream'])) {
       return out(T('The **Talent board** searches published candidate portfolios by name, email or skills, and filters by stream and programme stage.'), [act('Explore talent board', '/talent-board')]);
@@ -156,10 +167,12 @@ function reply(db, user, rawMessage) {
     }
     if (has(text, KW.journey)) {
       const rm = getRoadmap(db, user.id);
-      if (rm.allComplete) return out(T("You've completed every milestone. Congratulations on your placement!"), [], { mood: 'celebrate' });
+      if (rm.allComplete) return out(T('You have completed the CAPACITI programme. Congratulations!'), [], { mood: 'celebrate' });
       const m = rm.milestones[rm.activeIndex];
       const left = m.requirements.filter((r) => !r.completed).map((r) => `• ${T(r.label)}`);
-      let msg = `${T("You're at **{milestone}** (step {step} of 5) and {pct}% through the programme overall. Still to do here:", { milestone: T(m.title), step: rm.activeIndex + 1, pct: rm.percentComplete })}\n${left.join('\n')}`;
+      let msg = left.length
+        ? `${T('Your official stage is **{milestone}** (step {step} of 5) and you are {pct}% through the programme. To be ready for the next stage:', { milestone: T(m.title), step: rm.activeIndex + 1, pct: rm.percentComplete })}\n${left.join('\n')}`
+        : T('Your official stage is **{milestone}** (step {step} of 5) and every exit criterion is evidenced. Your facilitator can now review you for the next stage.', { milestone: T(m.title), step: rm.activeIndex + 1 });
       if (rm.blockers.length) msg += `\n\n${T('You also have {n} open support cases that could affect your progress.', { n: rm.blockers.length })}`;
       return out(msg, [act('View my roadmap', '/dashboard#roadmap')]);
     }

@@ -29,6 +29,19 @@
       <div id="kpis" class="stagger relative mt-6 grid grid-cols-2 gap-3 md:grid-cols-4"></div>
     </section>
 
+    <section class="card" data-tour="pipeline" aria-labelledby="pipe-title">
+      <div class="flex flex-wrap items-end justify-between gap-3">
+        <div><h2 id="pipe-title" class="text-lg">Programme pipeline</h2><p id="pipe-note" class="text-sm text-white/55">Official stages across every stream.</p></div>
+        <a href="/stage-decisions" class="btn btn-ghost btn-sm">Stage decisions &amp; audit trail</a>
+      </div>
+      <div id="pipe-kpis" class="stagger mt-4 grid grid-cols-2 gap-3 md:grid-cols-4"></div>
+      <h3 class="mt-6 text-sm font-semibold">Candidates per stream</h3>
+      <div id="pipe-legend" class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/70"></div>
+      <div class="mt-2 overflow-x-auto">
+        <table class="w-full text-sm"><thead class="text-xs text-white/50"><tr id="pipe-head"></tr></thead><tbody id="pipe-streams" class="divide-y divide-white/10"></tbody></table>
+      </div>
+    </section>
+
     <section class="card" data-tour="users" aria-labelledby="users-title">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 id="users-title" class="text-lg">Users &amp; roles</h2>

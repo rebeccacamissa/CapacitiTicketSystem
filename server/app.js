@@ -28,6 +28,9 @@ function createApp() {
   // Ticket attachments (base64, up to 5 files x 5 MB) get a larger body limit than the rest of the API.
   const bigJson = express.json({ limit: '36mb' });
   app.use((req, res, next) => (/^\/api\/requests\/\d+\/attachments$/.test(req.path) ? bigJson(req, res, next) : next()));
+  // Portfolio uploads (one file up to 5 MB, base64) and AI CV tailoring (pasted CV + job advert).
+  const midJson = express.json({ limit: '8mb' });
+  app.use((req, res, next) => (/^\/api\/portfolio\/(files|cv\/tailor|cv\/tailored)$/.test(req.path) ? midJson(req, res, next) : next()));
   app.use(express.json({ limit: '100kb' }));
   app.use(cookieParser());
 
@@ -38,6 +41,8 @@ function createApp() {
   app.use('/api/analytics', require('./modules/analytics/analytics.routes'));
   app.use('/api/progress', require('./modules/progress/progress.routes'));
   app.use('/api/recruiter', require('./modules/recruiter/recruiter.routes'));
+  app.use('/api/stages', require('./modules/stages/stage.routes'));
+  app.use('/api/portfolio', require('./modules/portfolio/portfolio.routes'));
   app.use('/api/admin', require('./modules/admin/admin.routes'));
   app.use('/api/cammy', require('./modules/cammy/cammy.routes'));
   app.use('/api/events', require('./realtime/realtime.routes'));

@@ -2,14 +2,14 @@ import { api } from '../api.js';
 import { initPage, ROLE_LABEL } from '../layout.js';
 import { icon } from '../icons.js';
 import { onLive } from '../live.js';
-import { esc, toast, setBusy, avatarHtml, countUp, openModal, showFieldErrors } from '../ui.js';
+import { esc, toast, setBusy, avatarHtml, countUp, openModal, showFieldErrors, t } from '../ui.js';
 
 const me = await initPage({ roles: ['admin'] });
 const options = await api('/meta/options');
 let users = [];
 let roleFilter = 'all';
 
-const ROLE_STYLE = { candidate: 'bg-purple/25 text-purple-30', support: 'bg-salmon/20 text-salmon-50', admin: 'bg-white/15 text-white', recruiter: 'bg-ok/15 text-ok' };
+const ROLE_STYLE = { candidate: 'bg-purple/25 text-purple-30', support: 'bg-salmon/20 text-salmon-50', admin: 'bg-white/15 text-white', recruiter: 'bg-ok/15 text-ok', facilitator: 'bg-purple/40 text-white' };
 
 // ---- KPIs ---------------------------------------------------------------------
 async function loadKpis() {
@@ -29,7 +29,7 @@ async function loadKpis() {
 
 // ---- Users ------------------------------------------------------------------
 const filterEl = document.getElementById('role-filter');
-filterEl.innerHTML = [['all', 'All'], ['candidate', 'Candidates'], ['support', 'Support'], ['admin', 'Admins'], ['recruiter', 'Recruiters']].map(([v, l]) =>
+filterEl.innerHTML = [['all', 'All'], ['candidate', 'Candidates'], ['support', 'Support'], ['admin', 'Admins'], ['recruiter', 'Recruiters'], ['facilitator', 'Facilitators']].map(([v, l]) =>
   `<button type="button" data-filter="${v}" aria-pressed="${v === roleFilter}" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-white/60 transition hover:text-white aria-pressed:bg-white/15 aria-pressed:text-white">${l}</button>`).join('');
 filterEl.addEventListener('click', (e) => {
   const b = e.target.closest('[data-filter]');
@@ -54,11 +54,14 @@ function renderUsers() {
         <div class="min-w-0"><p class="truncate font-medium">${esc(u.full_name)}${u.id === me.id ? ' <span class="text-xs text-white/40">(you)</span>' : ''}</p><p class="truncate text-xs text-white/50">${esc(u.email)}</p></div></div></td>
       <td><label class="sr-only" for="role-${u.id}">Role for ${esc(u.full_name)}</label>
         <select id="role-${u.id}" data-role="${u.id}" class="field !w-44 !py-1.5 !text-xs" ${u.id === me.id ? 'disabled' : ''}>
-          ${['candidate', 'support', 'admin', 'recruiter'].map((r) => `<option value="${r}" ${r === u.role ? 'selected' : ''}>${ROLE_LABEL[r]}</option>`).join('')}
+          ${['candidate', 'support', 'admin', 'facilitator', 'recruiter'].map((r) => `<option value="${r}" ${r === u.role ? 'selected' : ''}>${ROLE_LABEL[r]}</option>`).join('')}
         </select></td>
       <td class="text-xs text-white/65">${u.role === 'candidate'
         ? `${esc(u.stream || '—')}<span class="block text-white/40">${esc(u.cohort || '')} · ${u.requests_raised} request(s)</span>`
-        : `${esc(u.position || '—')}<span class="block text-white/40">${esc(u.employee_id || 'No employee ID')} · ${u.active_assigned} active case(s)</span>`}</td>
+        : u.role === 'facilitator'
+          ? `${u.streams?.length ? u.streams.map((s) => `<span class="chip mr-1 mb-1 !text-[0.65rem]">${esc(s)}</span>`).join('') : '<span class="text-warn">No streams assigned</span>'}
+             <button type="button" class="block text-xs font-semibold text-salmon-50 hover:underline" data-streams="${u.id}">Edit streams</button>`
+          : `${esc(u.position || '—')}<span class="block text-white/40">${esc(u.employee_id || 'No employee ID')} · ${u.active_assigned} active case(s)</span>`}</td>
       <td><div class="flex flex-col items-start gap-1">${u.is_active ? '<span class="badge bg-ok/15 text-ok"><span class="h-1.5 w-1.5 rounded-full bg-ok"></span>Active</span>' : '<span class="badge bg-white/10 text-white/50">Deactivated</span>'}
         ${u.must_change_password ? `<span class="badge bg-warn/15 text-warn">${icon('key', 'h-3 w-3')}Temp password</span>` : ''}</div></td>
       <td class="text-right">${u.id === me.id ? '' : `<div class="flex justify-end gap-1.5">
@@ -96,6 +99,7 @@ table.addEventListener('change', async (e) => {
 table.addEventListener('click', async (e) => {
   const b = e.target.closest('button');
   if (!b) return;
+  if (b.dataset.streams) return editStreams(users.find((x) => x.id === Number(b.dataset.streams)));
   const id = Number(b.dataset.reset || b.dataset.active || b.dataset.remove);
   const u = users.find((x) => x.id === id);
   if (!u) return;
@@ -126,14 +130,56 @@ table.addEventListener('click', async (e) => {
   } catch (err) { toast(err.message, 'error'); }
 });
 
+function editStreams(u) {
+  const m = openModal(`
+    <form class="p-6" novalidate>
+      <h2 class="text-xl">Streams for ${esc(u.full_name)}</h2>
+      <p class="mt-1 text-sm text-white/60">This facilitator can review evidence and approve stage decisions only for candidates in these streams.</p>
+      <div class="mt-4 grid gap-1.5 sm:grid-cols-2">${options.streams.map((s) => `<label class="flex items-center gap-2 rounded-lg bg-white/[0.04] px-3 py-2 text-sm"><input type="checkbox" name="streams" value="${esc(s)}" class="h-4 w-4 accent-salmon" ${u.streams?.includes(s) ? 'checked' : ''}>${esc(s)}</label>`).join('')}</div>
+      <div class="mt-6 flex justify-end gap-2"><button type="button" class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary">Save streams</button></div>
+    </form>`);
+  const form = m.el.querySelector('form');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      await api(`/admin/users/${u.id}/streams`, { method: 'PUT', body: { streams: [...form.querySelectorAll('[name="streams"]:checked')].map((c) => c.value) } });
+      m.close();
+      toast('Streams updated', 'success');
+      loadUsers(); loadPipeline();
+    } catch (err) { toast(err.message, 'error'); }
+  });
+}
+
+// ---- Programme pipeline (official stages) ------------------------------------------
+async function loadPipeline() {
+  const p = await api('/stages/pipeline');
+  const kpi = [['Total candidates', p.total, 'users'], ['In training', p.byStage.training, 'book'], ['Work ready', p.byStage.work_ready, 'checkCircle'], ['Placed', p.byStage.placed, 'trophy']];
+  document.getElementById('pipe-kpis').innerHTML = kpi.map(([label, n, ic]) => `
+    <article class="rounded-2xl border border-white/10 bg-white/[0.04] p-4"><p class="flex items-center gap-2 text-xs text-white/60">${icon(ic, 'h-4 w-4 text-salmon-50')}${t(label)}</p>
+      <p class="mt-2 font-display text-3xl font-semibold tabular-nums">${n}</p></article>`).join('');
+  document.getElementById('pipe-note').textContent = t('Enrolled: {e} · Completed: {c} · Ready for a stage review: {r}', { e: p.byStage.enrolled, c: p.byStage.completed, r: p.awaitingReview });
+
+  // Stream x stage: a stacked bar per stream (ordered stage = one hue family, light to dark) plus the table view.
+  const colors = { enrolled: 'bg-white/25', training: 'bg-purple-50', work_ready: 'bg-purple', placed: 'bg-salmon', completed: 'bg-ok' };
+  document.getElementById('pipe-legend').innerHTML = p.stages.map((s) => `<span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm ${colors[s.key]}" aria-hidden="true"></span>${esc(t(s.label))}</span>`).join('');
+  document.getElementById('pipe-streams').innerHTML = p.byStream.length ? p.byStream.map((r) => `
+    <tr>
+      <th scope="row" class="py-2 pr-3 text-left font-medium">${esc(r.stream)}</th>
+      ${p.stages.map((s) => `<td class="py-2 pr-3 text-center tabular-nums ${r[s.key] ? '' : 'text-white/30'}">${r[s.key]}</td>`).join('')}
+      <td class="py-2 pr-3 text-center font-semibold tabular-nums">${r.total}</td>
+      <td class="w-48 py-2"><span class="flex h-2.5 gap-0.5 overflow-hidden rounded-full" aria-hidden="true">${p.stages.filter((s) => r[s.key]).map((s) => `<span class="${colors[s.key]} h-full" style="flex:${r[s.key]}" title="${esc(t(s.label))}: ${r[s.key]}"></span>`).join('')}</span></td>
+    </tr>`).join('') : `<tr><td colspan="${p.stages.length + 3}" class="py-6 text-center text-white/50">${t('No candidates yet.')}</td></tr>`;
+  document.getElementById('pipe-head').innerHTML = `<th scope="col" class="py-2 pr-3 text-left">${t('Stream')}</th>${p.stages.map((s) => `<th scope="col" class="py-2 pr-3 text-center">${esc(t(s.label))}</th>`).join('')}<th scope="col" class="py-2 pr-3 text-center">${t('Total')}</th><th scope="col" class="py-2"><span class="sr-only">${t('Distribution')}</span></th>`;
+}
+
 // ---- Add user (temporary password generated by the server) -----------------------
 document.getElementById('add-user').addEventListener('click', () => {
   const m = openModal(`
     <form class="p-6" novalidate>
       <h2 class="text-xl">Add a user</h2>
       <p class="mt-1 text-sm text-white/60">A secure temporary password is generated automatically.</p>
-      <div class="mt-5 grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-white/5 p-1" role="radiogroup" aria-label="Role">
-        ${['support', 'admin', 'candidate'].map((r, i) => `<label class="cursor-pointer rounded-lg px-2 py-2 text-center text-xs font-semibold text-white/60 transition has-[:checked]:bg-gradient-to-r has-[:checked]:from-purple has-[:checked]:to-salmon has-[:checked]:text-white">
+      <div class="mt-5 grid grid-cols-2 gap-1 rounded-xl sm:grid-cols-5 border border-white/10 bg-white/5 p-1" role="radiogroup" aria-label="Role">
+        ${['support', 'facilitator', 'admin', 'recruiter', 'candidate'].map((r, i) => `<label class="cursor-pointer rounded-lg px-2 py-2 text-center text-xs font-semibold text-white/60 transition has-[:checked]:bg-gradient-to-r has-[:checked]:from-purple has-[:checked]:to-salmon has-[:checked]:text-white">
           <input type="radio" name="role" value="${r}" class="sr-only" ${i === 0 ? 'checked' : ''}>${ROLE_LABEL[r]}</label>`).join('')}
       </div>
       <div class="mt-5 grid gap-4 sm:grid-cols-2">
@@ -150,6 +196,8 @@ document.getElementById('add-user').addEventListener('click', () => {
         <div data-for="candidate" hidden><label class="field-label" for="nu-mentor">Mentor</label><input id="nu-mentor" name="mentor" class="field"></div>
         <div data-for="candidate" hidden><label class="field-label" for="nu-tc">Tech Champ</label><input id="nu-tc" name="techChamp" class="field"></div>
         <div data-for="candidate" hidden class="sm:col-span-2"><label class="field-label" for="nu-sup">Supervisor</label><input id="nu-sup" name="supervisor" class="field"></div>
+        <fieldset data-for="facilitator" hidden class="sm:col-span-2"><legend class="field-label">Streams this facilitator approves stages for</legend>
+          <div class="grid gap-1.5 sm:grid-cols-2">${options.streams.map((s) => `<label class="flex items-center gap-2 rounded-lg bg-white/[0.04] px-3 py-2 text-sm"><input type="checkbox" name="streams" value="${esc(s)}" class="h-4 w-4 accent-salmon">${esc(s)}</label>`).join('')}</div></fieldset>
       </div>
       <div class="mt-6 flex justify-end gap-2"><button type="button" class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary btn-shine">Create user</button></div>
     </form>`, { wide: true });
@@ -159,6 +207,7 @@ document.getElementById('add-user').addEventListener('click', () => {
     const staff = form.role.value !== 'candidate';
     form.querySelectorAll('[data-for="staff"]').forEach((el) => { el.hidden = !staff; });
     form.querySelectorAll('[data-for="candidate"]').forEach((el) => { el.hidden = staff; });
+    form.querySelectorAll('[data-for="facilitator"]').forEach((el) => { el.hidden = form.role.value !== 'facilitator'; });
   };
   form.addEventListener('change', sync);
   form.addEventListener('submit', async (e) => {
@@ -166,6 +215,7 @@ document.getElementById('add-user').addEventListener('click', () => {
     const role = form.role.value;
     const keep = role === 'candidate' ? ['cohort', 'stream', 'mentor', 'techChamp', 'supervisor'] : ['position', 'employeeId'];
     const body = { role };
+    if (role === 'facilitator') body.streams = [...form.querySelectorAll('[name="streams"]:checked')].map((c) => c.value);
     for (const k of ['firstName', 'surname', 'email', 'dateOfBirth', 'gender', ...keep]) body[k] = form[k].value.trim() || undefined;
     const errs = {};
     if (!body.firstName) errs.firstName = 'Required';
@@ -236,6 +286,8 @@ probe.addEventListener('submit', async (e) => {
 
 loadKpis();
 loadUsers();
+loadPipeline();
+onLive('people', loadPipeline);
 loadCats();
 onLive('people', loadUsers);
 onLive('request', loadKpis, 800);

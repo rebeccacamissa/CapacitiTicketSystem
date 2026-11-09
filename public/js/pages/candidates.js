@@ -6,7 +6,8 @@ import { icon } from '../icons.js';
 import { onLive } from '../live.js';
 import { needLabel } from '../needs.js';
 
-await initPage({ roles: ['support', 'admin'] });
+const me = await initPage({ roles: ['support', 'admin', 'facilitator'] });
+const canEdit = me.role !== 'facilitator'; // facilitators verify evidence but don't edit profile details
 
 const [{ candidates }, options] = await Promise.all([api('/candidates'), api('/meta/options')]);
 const list = document.getElementById('cand-list');
@@ -47,13 +48,14 @@ async function select(id) {
             ${p.birthday ? `<span class="chip">${icon('cake', 'h-3.5 w-3.5')}${p.birthday.isToday ? 'Birthday today!' : `Birthday in ${p.birthday.daysUntil} days`}</span>` : ''}
           </div>
         </div>
-        <a href="/requests?q=${encodeURIComponent(p.fullName)}" class="btn btn-ghost">View requests</a>
+        ${canEdit ? `<a href="/requests?q=${encodeURIComponent(p.fullName)}" class="btn btn-ghost">View requests</a>` : ''}
+        ${['admin', 'facilitator'].includes(me.role) ? `<a href="/stage-decisions?candidate=${p.id}" class="btn btn-primary">Review stage</a>` : ''}
       </div>
       ${p.accessibility?.needs?.length ? `<div class="relative mt-4 rounded-xl border border-white/15 bg-ink/40 p-3 text-sm"><p class="flex items-center gap-1.5 font-semibold">${icon('accessibility', 'h-4 w-4')}Accessibility needs</p>
         <p class="mt-1 text-white/75">${p.accessibility.needs.map((n) => esc(needLabel(n))).join(' · ')}</p>${p.accessibility.notes ? `<p class="mt-1 text-xs text-white/60" translate="no">${esc(p.accessibility.notes)}</p>` : ''}</div>` : ''}
     </section>
 
-    <form id="cand-form" class="card space-y-5 animate-fade-up [animation-delay:80ms]" novalidate>
+    <form id="cand-form" class="card space-y-5 animate-fade-up [animation-delay:80ms]" novalidate ${canEdit ? '' : 'hidden'}>
       <div class="flex items-center justify-between gap-3"><h3 class="text-lg">Candidate information</h3>
         <p class="text-xs text-white/45">${c.updatedAt ? `Last updated ${fmtDate(c.updatedAt)}` : ''}</p></div>
       <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

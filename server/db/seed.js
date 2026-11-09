@@ -19,12 +19,20 @@ const { createRequest } = require('../modules/requests/requests.service');
 const wf = require('../modules/workflow/transition.service');
 
 const db = getDb();
+const PASSWORD = 'Capaciti@2026';
 if (db.prepare('SELECT COUNT(*) n FROM users').get().n > 0) {
+  // Databases seeded before the facilitator role existed still get the demo facilitator.
+  if (!db.prepare("SELECT 1 FROM users WHERE email = 'facilitator@capaciti.org.za'").get()) {
+    const id = Number(db.prepare("INSERT INTO users (full_name, first_name, surname, email, password_hash, role, date_of_birth, gender) VALUES ('Naledi Sithole', 'Naledi', 'Sithole', 'facilitator@capaciti.org.za', ?, 'facilitator', '1990-09-21', 'female')")
+      .run(bcrypt.hashSync(PASSWORD, 10)).lastInsertRowid);
+    db.prepare("INSERT INTO staff_profiles (user_id, position, employee_id) VALUES (?, 'Learning Facilitator', NULL)").run(id);
+    for (const stream of ['Software Development', 'Data Science & Analytics', 'Cybersecurity']) db.prepare('INSERT INTO facilitator_streams (user_id, stream) VALUES (?, ?)').run(id, stream);
+    console.log('Added the demo facilitator account.');
+  }
   console.log('Database already has users — skipping seed. Use `npm run db:reset` to start fresh.');
   process.exit(0);
 }
 
-const PASSWORD = 'Capaciti@2026';
 const hash = bcrypt.hashSync(PASSWORD, 10);
 /** DOB whose next birthday is `inDays` from today (so the birthday features always demo well). */
 function dobIn(inDays, year) {
@@ -50,12 +58,14 @@ const admin = addUser('Nomsa Dlamini', 'admin@capaciti.org.za', 'admin', '1985-0
 const sup1 = addUser('Thabo Mokoena', 'thabo@capaciti.org.za', 'support', dobIn(21, 1992), { position: 'Programme Manager', employeeId: 'CAP-0142', gender: 'male' });
 const sup2 = addUser('Aisha Patel', 'aisha@capaciti.org.za', 'support', '1994-07-02', { position: 'Support Specialist', employeeId: 'CAP-0187', gender: 'female', avatar: { v: 2, art: 'polished', look: 'doll', skin: 'b98e6a', hair: 'sideComed', hairColor: '2c1b18', rearHair: 'longStraight', facialHair: 'none', clothing: 'turtleNeck', clothesColor: 'be185d', bg: 'sunset' } });
 addUser('Recruiter Demo', 'recruiter@capaciti.org.za', 'recruiter', '1988-04-15', { position: 'Talent Partner', employeeId: 'CAP-0301' });
+const fac = addUser('Naledi Sithole', 'facilitator@capaciti.org.za', 'facilitator', '1990-09-21', { position: 'Learning Facilitator', employeeId: 'CAP-0220', gender: 'female' });
+for (const stream of ['Software Development', 'Data Science & Analytics', 'Cybersecurity']) db.prepare('INSERT INTO facilitator_streams (user_id, stream) VALUES (?, ?)').run(fac.id, stream);
 const team = { mentor: 'Thabo Mokoena', techChamp: 'Kyle Adams', supervisor: 'Aisha Patel' };
 const c1 = addUser('Lerato Khumalo', 'lerato@example.com', 'candidate', dobIn(9, 2001), { cohort: '2026 Cohort 1 · Cape Town', stream: 'Software Development', ...team, gender: 'female' });
 const c2 = addUser('Sipho Ndlovu', 'sipho@example.com', 'candidate', dobIn(0, 2002), { cohort: '2026 Cohort 1 · Johannesburg', stream: 'Data Science & Analytics', mentor: 'Aisha Patel', techChamp: 'Naledi Sithole', supervisor: 'Thabo Mokoena', gender: 'male', avatar: { v: 2, art: 'classic', look: 'tactical', skin: '614335', hair: 'shortFlat', hairColor: '2c1b18', hatColor: '4b5320', facialHair: 'beardLight', clothing: 'hoodie', clothesColor: '4b5320', graphic: 'skullOutline', accessory: 'wayfarers', accessoryColor: '151613', bg: 'camo' } });
 const c3 = addUser('Zanele Mthembu', 'zanele@example.com', 'candidate', dobIn(40, 2000), { cohort: '2026 Cohort 1 · Cape Town', stream: 'Cloud Engineering', ...team, gender: 'female', avatar: { v: 2, art: 'classic', look: 'doll', skin: 'ae5d29', hair: 'dreads02', hairColor: '2c1b18', hatColor: '1d2951', facialHair: 'none', clothing: 'shirtScoopNeck', clothesColor: 'ec4899', graphic: 'diamond', accessory: 'wayfarers', accessoryColor: 'f1d1d1', bg: 'sunset' } });
-addUser('Kagiso Molefe', 'kagiso@example.com', 'candidate', dobIn(4, 2003), { cohort: '2026 Cohort 2 · Remote', stream: 'Cybersecurity', mentor: 'Aisha Patel', techChamp: 'Kyle Adams', supervisor: 'Nomsa Dlamini', gender: 'male' });
-addUser('Amahle Zulu', 'amahle@example.com', 'candidate', '2001-11-30', { cohort: '2026 Cohort 2 · Cape Town', stream: 'UX/UI Design', ...team, gender: 'female', avatar: { v: 2, art: 'classic', look: 'runway', skin: '614335', hair: 'fro', hairColor: '2c1b18', hatColor: '1d2951', facialHair: 'none', clothing: 'blazerAndShirt', clothesColor: 'f25251', graphic: 'diamond', accessory: 'round', accessoryColor: 'd4af37', bg: 'night' } });
+const c4 = addUser('Kagiso Molefe', 'kagiso@example.com', 'candidate', dobIn(4, 2003), { cohort: '2026 Cohort 2 · Remote', stream: 'Cybersecurity', mentor: 'Aisha Patel', techChamp: 'Kyle Adams', supervisor: 'Nomsa Dlamini', gender: 'male' });
+const c5 = addUser('Amahle Zulu', 'amahle@example.com', 'candidate', '2001-11-30', { cohort: '2026 Cohort 2 · Cape Town', stream: 'UX/UI Design', ...team, gender: 'female', avatar: { v: 2, art: 'classic', look: 'runway', skin: '614335', hair: 'fro', hairColor: '2c1b18', hatColor: '1d2951', facialHair: 'none', clothing: 'blazerAndShirt', clothesColor: 'f25251', graphic: 'diamond', accessory: 'round', accessoryColor: 'd4af37', bg: 'night' } });
 
 const cat = Object.fromEntries(db.prepare('SELECT id, name FROM categories').all().map((c) => [c.name, c.id]));
 
@@ -141,9 +151,27 @@ function progress(candidate, upToMilestone, partialCount, startDaysAgo) {
     }
   }
 }
-progress(c1, 3, 2, 120); // in training, 2/4 done
-progress(c2, 4, 3, 110); // work-ready
-progress(c3, 5, 4, 150); // placed
+progress(c1, 2, 2, 120); // In Training, 2/4 exit criteria evidenced
+progress(c2, 3, 3, 110); // Work Ready, 3/5
+progress(c3, 4, 1, 150); // Placed, first day done
+progress(c4, 1, 8, 40);  // Enrolled with every exit criterion evidenced: ready for a stage review
+progress(c5, 1, 3, 20);  // Enrolled, 3/8
+
+// Official stage decisions, inserted through the same database triggers as live decisions
+// (one step at a time, by the stream facilitator or an admin), backdated for a realistic trail.
+function decide(candidate, to, actor, reason, daysAgo) {
+  const from = db.prepare('SELECT stage FROM candidate_stages WHERE candidate_id = ?').get(candidate.id)?.stage || 'enrolled';
+  db.prepare(`INSERT INTO stage_decisions (candidate_id, from_stage, to_stage, direction, decided_by, reason, created_at)
+              VALUES (?, ?, ?, 'forward', ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now', '-' || ? || ' days'))`).run(candidate.id, from, to, actor.id, reason, daysAgo);
+  const { changes } = db.prepare("UPDATE candidate_stages SET stage = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now', '-' || ? || ' days') WHERE candidate_id = ?").run(to, daysAgo, candidate.id);
+  if (!changes) db.prepare("INSERT INTO candidate_stages (candidate_id, stage, updated_at) VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now', '-' || ? || ' days'))").run(candidate.id, to, daysAgo);
+}
+decide(c1, 'training', fac, 'Onboarding complete: contract signed, laptop and platform access confirmed, orientation attended.', 70);
+decide(c2, 'training', fac, 'All enrolment documents verified and orientation attended.', 90);
+decide(c2, 'work_ready', fac, 'Passed every assessment with 92% attendance; capstone dashboard submitted.', 25);
+decide(c3, 'training', admin, 'Enrolment checklist complete.', 130);
+decide(c3, 'work_ready', admin, 'Capstone deployed and all assessments passed.', 70);
+decide(c3, 'placed', admin, 'Matched with a corporate partner and internship agreement signed.', 12);
 
 // These seeded demo profiles are explicitly published for the recruiter preview.
 const savePortfolio = db.prepare(`
@@ -163,10 +191,7 @@ const gamify = require('../modules/engage/gamification.service');
 for (const row of db.prepare('SELECT candidate_id, requirement_id FROM candidate_requirement_progress').all()) {
   gamify.award(db, row.candidate_id, 'requirement', row.requirement_id);
 }
-const { getRoadmap } = require('../modules/progress/progress.service');
-for (const c of db.prepare("SELECT id FROM users WHERE role = 'candidate'").all()) {
-  for (const m of getRoadmap(db, c.id).milestones) if (m.state === 'completed') gamify.award(db, c.id, 'milestone', m.key);
-}
+for (const d of db.prepare("SELECT candidate_id, to_stage FROM stage_decisions WHERE direction = 'forward'").all()) gamify.award(db, d.candidate_id, 'milestone', d.to_stage);
 for (const r of db.prepare('SELECT id, candidate_id FROM requests').all()) gamify.award(db, r.candidate_id, 'request_created', r.id);
 for (const r of db.prepare("SELECT id, candidate_id FROM requests WHERE status = 'Closed'").all()) gamify.award(db, r.candidate_id, 'request_closed', r.id);
 for (const r of db.prepare("SELECT id, assigned_to FROM requests WHERE resolved_at IS NOT NULL AND assigned_to IS NOT NULL").all()) gamify.award(db, r.assigned_to, 'resolved', r.id);
@@ -192,6 +217,7 @@ console.table([
   { role: 'support', email: 'thabo@capaciti.org.za' },
   { role: 'support', email: 'aisha@capaciti.org.za' },
   { role: 'recruiter', email: 'recruiter@capaciti.org.za' },
+  { role: 'facilitator', email: 'facilitator@capaciti.org.za' },
   { role: 'candidate', email: 'lerato@example.com' },
   { role: 'candidate', email: 'sipho@example.com' },
   { role: 'candidate', email: 'zanele@example.com' },

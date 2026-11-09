@@ -30,23 +30,38 @@ function canSee(db, requestId, user) {
   if (!r || (user.role === 'candidate' && r.candidate_id !== user.id)) throw notFound('Request not found');
 }
 
-function save(db, requestId, user, { name, data, isInternal }) {
-  canSee(db, requestId, user);
+/**
+ * Validate a base64 upload: safe file name, allowed extension, size limit and a
+ * magic-byte check that the content really is that type. Shared with portfolio files.
+ */
+function decodeUpload({ name, data }, allowed = Object.keys(TYPES), describe = 'images, PDF, Word, Excel or text') {
   const base = path.basename(String(name || '')).replace(/[^\w.\- ()]/g, '_').slice(0, 120);
   const extRaw = base.split('.').pop().toLowerCase();
   const ext = ALIAS[extRaw] || extRaw;
-  const type = TYPES[ext];
-  if (!base || !type) throw badRequest(`"${base || 'file'}" isn't an allowed type (images, PDF, Word, Excel or text)`);
+  const type = allowed.includes(ext) ? TYPES[ext] : null;
+  if (!base || !type) throw badRequest(`"${base || 'file'}" isn't an allowed type (${describe})`);
   const m = /^data:[^;,]*;base64,([A-Za-z0-9+/=]+)$/.exec(data || '');
   if (!m) throw badRequest('File data is invalid');
   const buf = Buffer.from(m[1], 'base64');
   if (!buf.length) throw badRequest('File is empty');
   if (buf.length > MAX_BYTES) throw badRequest(`"${base}" is larger than 5 MB`);
   if (!type.test(buf)) throw badRequest(`"${base}" doesn't look like a real .${ext} file`);
+  return { base, ext, buf, mime: type.mime, inline: !!type.inline };
+}
 
-  fs.mkdirSync(DIR, { recursive: true });
+/** Write bytes under a random name (never the user's name) outside the web root. */
+function writeUpload(dir, ext, buf) {
+  fs.mkdirSync(dir, { recursive: true });
   const stored = `${crypto.randomBytes(16).toString('hex')}.${ext}`;
-  fs.writeFileSync(path.join(DIR, stored), buf);
+  fs.writeFileSync(path.join(dir, stored), buf);
+  return stored;
+}
+
+function save(db, requestId, user, { name, data, isInternal }) {
+  canSee(db, requestId, user);
+  const { base, ext, buf, mime } = decodeUpload({ name, data });
+  const stored = writeUpload(DIR, ext, buf);
+  const type = { mime };
   const { lastInsertRowid } = db.prepare(`
     INSERT INTO attachments (request_id, uploader_id, stored_name, original_name, mime, size, is_internal) VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(requestId, user.id, stored, base, type.mime, buf.length, user.role !== 'candidate' && isInternal ? 1 : 0);
@@ -70,4 +85,4 @@ function open(db, id, user) {
   return { path: path.join(DIR, a.stored_name), name: a.original_name, mime: a.mime, inline: !!TYPES[ext]?.inline };
 }
 
-module.exports = { save, list, open, MAX_BYTES };
+module.exports = { save, list, open, decodeUpload, writeUpload, TYPES, MAX_BYTES };

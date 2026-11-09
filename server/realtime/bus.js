@@ -27,7 +27,7 @@ function publish(to, type, data = {}) {
   const ids = Array.isArray(to) ? new Set(to.filter(Boolean)) : null;
   for (const [userId, set] of clients) {
     for (const c of set) {
-      const match = to === 'all' || (to === 'staff' && ['support', 'admin'].includes(c.role)) || (ids && ids.has(userId));
+      const match = to === 'all' || (to === 'staff' && ['support', 'admin', 'facilitator'].includes(c.role)) || (ids && ids.has(userId));
       if (match) c.res.write(payload);
     }
   }

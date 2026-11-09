@@ -26,7 +26,7 @@ async function loadProfileAndHero() {
   document.getElementById('hero-chip').textContent = p.candidate?.stream || 'Candidate';
   document.getElementById('hero-level').textContent = t('Level {level} · {xp} XP', { level: g.level, xp: g.xp });
   document.getElementById('hero-sub').textContent = rm
-    ? (rm.allComplete ? t("You've completed every milestone. Congratulations on your placement!") : t("You're {pct}% of the way to your internship. Next up: {next}.", { pct: rm.percentComplete, next: t(rm.milestones[rm.activeIndex].title) }))
+    ? (rm.allComplete ? t('You have completed the CAPACITI programme. Congratulations!') : t('Official stage: {stage}. You are {pct}% of the way through the programme.', { stage: t(rm.stage.label), pct: rm.percentComplete }))
     : '';
 
   // Full-body avatar in the hero (no background so it blends into the card)
@@ -126,6 +126,30 @@ async function loadUpcoming() {
     </li>`).join('') : '<li class="text-sm text-white/50">No birthdays in the next two weeks.</li>';
 }
 
+const KIND_LABEL = { cv: 'CV files', project: 'Project files', certificate: 'Certificates' };
+async function loadPortfolioCards() {
+  const [{ portfolio }, { files }] = await Promise.all([api('/recruiter/me'), api('/portfolio/files')]);
+  const st = rm?.stage;
+  const count = (k) => files.filter((f) => f.kind === k).length;
+  const card = (ic, title, body) => `<article class="glass glow-ring flex flex-col p-5"><div class="flex items-center gap-2 text-xs font-semibold tracking-wider text-white/55 uppercase"><span class="text-salmon-50">${icon(ic, 'h-4 w-4')}</span>${title}</div>${body}</article>`;
+  document.getElementById('pf-cards').innerHTML = [
+    card('flag', t('Current stage'), st ? `<p class="mt-3 font-display text-2xl font-semibold">${esc(t(st.label))}</p>
+      <p class="mt-1 text-xs text-white/55">${t('Since {date}', { date: fmtDate(st.since) })}${st.next ? ` · ${t('Next: {stage}', { stage: t(st.next.label) })}` : ''}</p>
+      ${rm.readyForReview ? `<span class="badge mt-3 self-start bg-ok/15 text-ok">${icon('checkCircle', 'h-3.5 w-3.5')}${t('Ready for review')}</span>` : ''}
+      ${st.lastDecision
+        ? `<p class="mt-3 text-xs text-white/60">${t('Last decision by {name}, {when}', { name: esc(st.lastDecision.by), when: fmtRelative(st.lastDecision.at) })}</p>`
+        : `<p class="mt-3 text-xs text-white/50">${t('Your facilitator approves each stage, one step at a time.')}</p>`}` : ''),
+    card('folder', t('Portfolio items'), `<p class="mt-3 font-display text-2xl font-semibold tabular-nums">${portfolio.projects.length + files.length}</p>
+      <ul class="mt-2 flex flex-wrap gap-1.5 text-xs">
+        <li class="chip">${t('Project links')}: ${portfolio.projects.length}</li>${Object.keys(KIND_LABEL).map((k) => `<li class="chip">${t(KIND_LABEL[k])}: ${count(k)}</li>`).join('')}
+      </ul>
+      ${count('cv') ? '' : `<p class="mt-3 text-xs text-white/55">${t('Upload your CV so recruiters and your facilitator can see it.')}</p>`}`),
+    card(portfolio.isPublished ? 'eye' : 'lock', t('Recruiter visibility'), `<p class="mt-3 font-display text-2xl font-semibold ${portfolio.isPublished ? 'text-ok' : ''}">${portfolio.isPublished ? t('Visible to recruiters') : t('Private')}</p>
+      <p class="mt-1 text-xs text-white/55">${portfolio.isPublished ? t('Recruiters can see your shared profile, projects and files.') : t('Only you and the programme team can see your portfolio.')}</p>
+      <a href="/profile#portfolio-sharing" class="btn btn-ghost btn-sm mt-auto self-start pt-2">${portfolio.isPublished ? t('Change sharing') : t('Share with recruiters')}</a>`),
+  ].join('');
+}
+
 async function loadRoadmap() {
   try {
     rm = await api('/progress/me');
@@ -136,11 +160,11 @@ async function loadRoadmap() {
 }
 
 await loadRoadmap();
-await Promise.all([loadProfileAndHero(), loadStats(), loadRecent(), loadUpcoming(), loadFeed()]);
+await Promise.all([loadProfileAndHero(), loadStats(), loadRecent(), loadUpcoming(), loadFeed(), loadPortfolioCards()]);
 if (location.hash === '#roadmap') document.getElementById('roadmap')?.scrollIntoView({ behavior: 'smooth' });
 
 // Live updates — no polling
-onLive('progress', async () => { await loadRoadmap(); loadProfileAndHero(); toast('Your roadmap was just updated', 'success'); });
+onLive('progress', async () => { await loadRoadmap(); loadProfileAndHero(); loadPortfolioCards(); toast('Your roadmap was just updated', 'success'); });
 onLive('request', () => { loadStats(); loadRecent(); });
 onLive('xp', loadProfileAndHero);
 onLive('feed', loadFeed);

@@ -6,7 +6,7 @@
 - **Framework:** Node's built-in test runner (`node:test` + `node:assert`). No extra test dependencies.
 - **Scope:** end-to-end API tests. Each run starts the real Express app on a random port against a fresh **in-memory SQLite database**, then makes real HTTP calls with cookies.
 
-**Latest run: 21 passed, 0 failed.** The full output is in [test-results.txt](test-results.txt).
+**Latest run: 34 passed, 0 failed** (21 core + 3 recruiter + 10 stages). The full output is in [test-results.txt](test-results.txt).
 
 | # | Test | What it proves |
 |---|---|---|
@@ -31,6 +31,23 @@
 | 19 | Accessibility needs are private to the candidate and staff | Staff see the needs; candidates' own request responses don't include them |
 | 20 | Language preference is saved and Cammy answers in that language | isiZulu reply; translated suggestion buttons still send the English intent |
 | 21 | Extended accessibility preferences validate | High contrast, text size and font accepted; invalid values rejected |
+
+**Recruiter tests** (`tests/recruiter.test.js`, 3) cover publishing, recruiter-only access and unpublishing.
+
+**Stage, facilitator, portfolio and AI tests** (`tests/stages.test.js`, 10):
+
+| # | Test | What it proves |
+|---|---|---|
+| S1 | Facilitators only see candidates in their streams | Other streams return 404; no access to tickets; support can't make stage decisions |
+| S2 | Forward decisions go one step at a time; same-stage decisions are blocked | `STAGE_SKIP`, `STAGE_UNCHANGED`, reason required; out-of-stream decision is 404 |
+| S3 | Backward moves are admin-only and need a written reason | Facilitator gets `STAGE_BACKWARD_ADMIN_ONLY`; short reason rejected; admin succeeds |
+| S4 | The database rejects stage changes that bypass the rules | Raw SQL: `STAGE_AUDIT_REQUIRED`, `STAGE_SKIP`, `STAGE_NOT_AUTHORISED`, `STAGE_UNCHANGED`; the trail can't be edited or deleted |
+| S5 | Stage audit trail scoping | Admin sees all, facilitator their streams, candidate their own; support and recruiters 403 |
+| S6 | Pipeline counts | By stage and stream; facilitator scoped; candidates 403 |
+| S7 | Portfolio files | Fake PDF rejected; wrong type per kind rejected; recruiter can open only after publishing |
+| S8 | Recruiter shortlist | Saved with a note; private to each recruiter; unpublished candidates can't be added |
+| S9 | AI CV tailoring without a key | Consent required; `503 AI_NOT_CONFIGURED`; reviewed drafts save as `ai_tailored` |
+| S10 | Invented-number check | Numbers not in the original CV are flagged |
 
 ## 2. Database enforcement demonstration
 
@@ -71,6 +88,8 @@ Every page was opened in headless Chrome at 1440 px (desktop) and 390 px (mobile
 | Screen reader | Run NVDA (Windows) or VoiceOver (Mac) on registration, new request and request detail; check labels, errors and announcements. |
 | Read-aloud and voice input | Chrome or Edge with a microphone. Voices in isiZulu, isiXhosa and Sepedi depend on what's installed on the device. |
 | Translations | A native speaker of each language should read every screen. |
+| AI CV tailoring | Set `ANTHROPIC_API_KEY`, upload a PDF CV as Lerato, tailor it for a real job advert, and compare the draft line by line with the original: nothing should be invented or inflated. |
+| Facilitator journey on mobile | The facilitator, stage-decision and shortlist pages were checked at 1440 px only. |
 
 ## 4. Bugs found during testing and fixed
 

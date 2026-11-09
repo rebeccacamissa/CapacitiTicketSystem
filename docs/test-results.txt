@@ -1,32 +1,45 @@
 Command: npm run test:report
-Generated: 2026-11-08T20:48:19.184Z · Node v24.12.0 · win32
+Generated: 2026-11-09T21:06:58.372Z · Node v24.12.0 · win32
 
-✔ state machine rules (application layer) (592.2756ms)
-✔ registration always creates a candidate and rejects weak passwords (66.9161ms)
-✔ candidate creates request with REQ-YYYY-NNNN reference (38.7379ms)
-✔ candidates cannot see other candidates' requests (55.3061ms)
-✔ illegal transition Open → Closed is rejected with 409 (40.2362ms)
-✔ DB probe proves the trigger blocks illegal transitions independently (44.4052ms)
-✔ full workflow with audit trail + candidate auto-transition on reply (194.8921ms)
-✔ admin override is allowed, audited, and one-shot (54.9755ms)
-✔ audit log is immutable (7.9274ms)
-✔ roadmap active node advances as requirements are verified (132.5584ms)
-✔ analytics summary is staff-only (39.0119ms)
-✔ admin creates staff with a temporary password that must be changed (141.6361ms)
-✔ support can update candidate programme details; candidates cannot (69.4891ms)
-✔ Cammy answers with personalised context (66.3529ms)
-✔ new users get a plain gender-based avatar; designs are validated and locked items enforced (165.9618ms)
-✔ candidate rates a resolved request; attachments are type-checked and access controlled (155.4531ms)
-✔ cohort feed: staff announce, everyone reacts; search is scoped (99.9368ms)
-✔ preferences and walkthrough completion persist (46.0623ms)
-✔ accessibility needs are private to the candidate and staff (64.7609ms)
-✔ language preference is saved and Cammy answers in that language (80.8661ms)
-✔ extended accessibility preferences validate (29.2114ms)
-ℹ tests 21
+✔ existing database user roles migrate without breaking candidate references (819.3673ms)
+✔ recruiters see only published profiles and cannot access ticket or candidate-management APIs (135.877ms)
+✔ candidates can publish their own portfolios and recruiters can read only the shared data (204.0137ms)
+✔ facilitators only see candidates in their streams (705.5746ms)
+✔ forward decisions go one step at a time; same-stage decisions are blocked (81.4601ms)
+✔ backward moves are admin-only and need a written reason (45.8574ms)
+✔ the database itself rejects stage changes that bypass the rules (6.603ms)
+✔ stage audit trail: admin sees all, facilitator their streams, candidate their own (150.6583ms)
+✔ pipeline counts candidates by stage and stream (191.3793ms)
+✔ portfolio files: real type checks and access rules (189.1105ms)
+✔ recruiter shortlist is saved and private to each recruiter (87.8073ms)
+✔ AI CV tailoring needs consent and reports itself unavailable without a key (60.6596ms)
+✔ invented numbers in a tailored CV are flagged for the candidate to check (2.6382ms)
+✔ state machine rules (application layer) (567.3762ms)
+✔ registration always creates a candidate and rejects weak passwords (64.1159ms)
+✔ candidate creates request with REQ-YYYY-NNNN reference (41.8298ms)
+✔ candidates cannot see other candidates' requests (46.0278ms)
+✔ illegal transition Open → Closed is rejected with 409 (25.3735ms)
+✔ DB probe proves the trigger blocks illegal transitions independently (38.1612ms)
+✔ full workflow with audit trail + candidate auto-transition on reply (137.9351ms)
+✔ admin override is allowed, audited, and one-shot (42.5525ms)
+✔ audit log is immutable (6.0046ms)
+✔ verified evidence marks a stage ready for review but never moves the official stage (132.4547ms)
+✔ analytics summary is staff-only (22.2878ms)
+✔ admin creates staff with a temporary password that must be changed (104.4066ms)
+✔ support can update candidate programme details; candidates cannot (41.142ms)
+✔ Cammy answers with personalised context (68.0371ms)
+✔ new users get a plain gender-based avatar; designs are validated and locked items enforced (85.2228ms)
+✔ candidate rates a resolved request; attachments are type-checked and access controlled (109.889ms)
+✔ cohort feed: staff announce, everyone reacts; search is scoped (84.7284ms)
+✔ preferences and walkthrough completion persist (41.1326ms)
+✔ accessibility needs are private to the candidate and staff (60.6087ms)
+✔ language preference is saved and Cammy answers in that language (56.2633ms)
+✔ extended accessibility preferences validate (22.038ms)
+ℹ tests 34
 ℹ suites 0
-ℹ pass 21
+ℹ pass 34
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 11315.1317
+ℹ duration_ms 10090.8312

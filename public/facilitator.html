@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My streams · CAPACITI Support</title>
+  <link rel="icon" href="/assets/logo-mark.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <main id="main" class="opacity-0 space-y-6" data-title="My streams" data-subtitle="Facilitator" data-easy="This page shows the candidates in your streams. When a candidate has finished everything for their stage, approve their next stage and write why.">
+    <section class="glass relative overflow-hidden p-6 sm:p-8">
+      <div class="absolute inset-0 bg-gradient-to-br from-purple/35 via-transparent to-salmon/25"></div>
+      <div class="relative flex flex-wrap items-end justify-between gap-4">
+        <div class="max-w-2xl">
+          <p class="chip !border-white/20 !text-white/80">Facilitator</p>
+          <h2 id="fac-hello" class="mt-4 text-3xl sm:text-4xl">Your streams</h2>
+          <p id="fac-streams" class="mt-3 text-white/65"></p>
+        </div>
+        <a href="/stage-decisions" class="btn btn-primary btn-shine">Open stage approvals</a>
+      </div>
+    </section>
+
+    <section aria-label="Stream summary" data-tour="fac-kpis">
+      <div id="fac-kpis" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="skeleton h-28"></div><div class="skeleton h-28"></div><div class="skeleton h-28"></div><div class="skeleton h-28"></div>
+      </div>
+    </section>
+
+    <div class="grid gap-6 xl:grid-cols-3">
+      <section class="card xl:col-span-1" data-tour="fac-review" aria-labelledby="review-title">
+        <h2 id="review-title" class="text-lg">Ready for review</h2>
+        <p class="mt-1 text-sm text-white/55">Every exit criterion for their current stage is evidenced.</p>
+        <ul id="fac-ready" class="stagger mt-4 space-y-2"></ul>
+      </section>
+      <section class="card xl:col-span-2" data-tour="fac-list" aria-labelledby="list-title">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="list-title" class="text-lg">Candidates in my streams</h2>
+          <label class="sr-only" for="fac-filter">Filter by stage</label>
+          <select id="fac-filter" class="field !w-auto !py-1.5 text-sm"></select>
+        </div>
+        <div class="mt-4 overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="text-xs tracking-wider text-white/50 uppercase"><tr><th class="py-2 pr-3 font-medium">Candidate</th><th class="py-2 pr-3 font-medium">Stream</th><th class="py-2 pr-3 font-medium">Official stage</th><th class="py-2 pr-3 font-medium">Evidence</th><th class="py-2 font-medium"><span class="sr-only">Actions</span></th></tr></thead>
+            <tbody id="fac-rows" class="divide-y divide-white/10"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script type="module" src="/js/pages/facilitator.js"></script>
+</body>
+</html>

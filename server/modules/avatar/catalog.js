@@ -36,7 +36,7 @@ const ART = {
     clothing: [
       ['shirtCrewNeck', 'Crew neck'], ['shirtVNeck', 'V-neck'], ['shirtScoopNeck', 'Scoop neck'], ['hoodie', 'Hoodie'],
       ['collarAndSweater', 'Collar & sweater'], ['graphicShirt', 'Graphic tee'], ['blazerAndShirt', 'Blazer & shirt'],
-      ['blazerAndSweater', 'Blazer & sweater', 'milestone_onboarding'], ['overall', 'Dungarees', 'first_request'],
+      ['blazerAndSweater', 'Blazer & sweater', 'milestone_training'], ['overall', 'Dungarees', 'first_request'],
     ],
     graphic: [['diamond', 'Diamond'], ['bear', 'Bear'], ['deer', 'Deer'], ['skullOutline', 'Skull'], ['bat', 'Bat'], ['pizza', 'Pizza'], ['hola', 'Hola'], ['cumbia', 'Cumbia']],
     accessory: [['none', 'None'], ['prescription01', 'Glasses'], ['prescription02', 'Square glasses'], ['round', 'Round glasses'], ['kurt', 'Retro shades'], ['wayfarers', 'Wayfarers'], ['sunglasses', 'Sunglasses'], ['eyepatch', 'Eye patch', 'milestone_training']],
@@ -48,7 +48,7 @@ const ART = {
     hair: [['bun', 'Bun'], ['sideComed', 'Side swept'], ['undercut', 'Undercut'], ['spiky', 'Spiky'], ['none', 'Shaved']],
     rearHair: [['none', 'None'], ['neckHigh', 'Neck length'], ['shoulderHigh', 'Shoulder length'], ['longStraight', 'Long straight'], ['longWavy', 'Long waves']],
     facialHair: [['none', 'None'], ['chin', 'Chin beard'], ['chinMoustache', 'Goatee'], ['fullBeard', 'Full beard'], ['longBeard', 'Long beard'], ['moustacheTwirl', 'Twirled moustache']],
-    clothing: [['tShirt', 'T-shirt'], ['shirt', 'Collared shirt'], ['turtleNeck', 'Turtleneck'], ['openJacket', 'Open jacket', 'milestone_onboarding'], ['dress', 'Dress', 'first_request']],
+    clothing: [['tShirt', 'T-shirt'], ['shirt', 'Collared shirt'], ['turtleNeck', 'Turtleneck'], ['openJacket', 'Open jacket', 'milestone_training'], ['dress', 'Dress', 'first_request']],
   },
 };
 

@@ -28,7 +28,9 @@ CAPACITI candidates raise support needs (connectivity, platform access, attendan
 | **Requests** | Automatic `REQ-2026-0001` references, SLA due dates by priority, search, filters, sorting, pagination, attachments with real file-type checks, internal notes, and 1–5 star satisfaction ratings |
 | **Candidate journey** | Animated 5-milestone roadmap (Screening → Onboarding → Training → Work Ready → Internship) with requirement tracking and alerts when open support cases may affect progress |
 | **Dashboards** | Support dashboard (queue, workload, 14-day trend, category and priority breakdowns, overdue cases, satisfaction) and admin control centre |
-| **Recruiter workspace** | Opt-in talent board, candidate profiles with verified programme credentials, and published project portfolios; recruiters cannot access support tickets |
+| **Recruiter workspace** | Opt-in talent board, candidate profiles with verified programme credentials, published project portfolios and documents, and a private saved shortlist; recruiters cannot access support tickets |
+| **Official stages & facilitators** | Enrolled → In Training → Work Ready → Placed → Completed. Facilitators approve the next stage for their streams, one step at a time, with a reason; only admins can move a candidate back. Every decision is in an append-only stage audit trail, enforced by database triggers. Admin pipeline by stage and stream |
+| **Portfolio documents & AI CV tailoring** | Secure CV / project / certificate uploads, portfolio cards on the candidate dashboard, and an optional, consent-based AI assistant (Claude) that tailors a CV to a job without adding anything that isn't already true |
 | **Live** | Server-Sent Events: tickets, notifications, roadmaps and the feed update without a refresh |
 | **Cammy** | An assistant that wears each user's avatar, has 7 moods, gives role-specific first-sign-in walkthroughs and answers from live data in 5 languages |
 | **Avatars** | Avatar studio with two art styles (Polished and the inclusive Classic), four looks, and badge-unlocked items |
@@ -46,7 +48,7 @@ CAPACITI candidates raise support needs (connectivity, platform access, attendan
 | Database | SQLite via built-in `node:sqlite` (no native build), with foreign keys, CHECK constraints, triggers and explicit transactions |
 | Security | `bcryptjs`, `jsonwebtoken`, `helmet`, `cookie-parser`, `dotenv` |
 | Avatars | DiceBear (Avataaars by Pablo Stanley; toonHead by Johan Melin, CC BY 4.0) |
-| Testing | Node's built-in test runner (21 end-to-end API tests on an in-memory database) |
+| Testing | Node's built-in test runner (34 end-to-end API tests on an in-memory database) |
 
 ## Quick start
 

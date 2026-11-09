@@ -13,11 +13,10 @@ const BADGES = [
   { key: 'first_request', name: 'First Steps', description: 'Raised your first support request', icon: 'ticket', roles: 'candidate' },
   { key: 'closer', name: 'Closer', description: 'Confirmed a resolution and closed a request', icon: 'check', roles: 'candidate' },
   { key: 'feedback', name: 'Voice Heard', description: 'Rated the support you received', icon: 'star', roles: 'candidate' },
-  { key: 'milestone_screening', name: 'Screened In', description: 'Completed Application & Screening', icon: 'flag', roles: 'candidate' },
-  { key: 'milestone_onboarding', name: 'On Board', description: 'Completed Enrolled & Onboarding', icon: 'flag', roles: 'candidate' },
-  { key: 'milestone_training', name: 'Trained Up', description: 'Completed In Training & Active Support', icon: 'flag', roles: 'candidate' },
+  { key: 'milestone_training', name: 'Trained Up', description: 'Started the In Training stage', icon: 'flag', roles: 'candidate' },
   { key: 'milestone_work_ready', name: 'Work Ready', description: 'Signed off as work ready', icon: 'flag', roles: 'candidate' },
   { key: 'milestone_placed', name: 'Placed', description: 'Started a corporate internship', icon: 'trophy', roles: 'candidate' },
+  { key: 'milestone_completed', name: 'Graduate', description: 'Completed the CAPACITI programme', icon: 'trophy', roles: 'candidate' },
   { key: 'solver', name: 'Problem Solver', description: 'Resolved 5 support requests', icon: 'bolt', roles: 'staff' },
   { key: 'helper', name: 'Town Crier', description: 'Posted your first announcement', icon: 'megaphone', roles: 'staff' },
 ];

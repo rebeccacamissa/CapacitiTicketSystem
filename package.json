@@ -23,6 +23,7 @@
     "evidence": "node scripts/capture-evidence.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.7.0",
     "@dicebear/collection": "^9.4.2",
     "@dicebear/core": "^9.4.3",
     "bcryptjs": "^3.0.2",

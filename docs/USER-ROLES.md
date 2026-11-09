@@ -1,10 +1,10 @@
 # User roles
 
-The system has three roles. Each role is checked **on the server** on every request: the route guard `authorize(...)`, ownership checks in the services, and the database triggers. Hiding a button in the interface is never the only protection.
+The system has five roles: the three core roles below, plus **Facilitator** and **Recruiter** (see [Facilitator and Recruiter](#facilitator-and-recruiter)). Each role is checked **on the server** on every request: the route guard `authorize(...)`, ownership checks in the services, and the database triggers. Hiding a button in the interface is never the only protection.
 
 | | Candidate | Support / Manager | Administrator |
 |---|---|---|---|
-| **Who** | A learner on a CAPACITI programme | Programme managers, support specialists, facilitators | Operations leads who run the platform |
+| **Who** | A learner on a CAPACITI programme | Programme managers and support specialists | Operations leads who run the platform |
 | **How the account is created** | Self-registration (`/register`) | Created by an admin, with a temporary password | Created by an admin, with a temporary password |
 | **Home page after sign-in** | `/dashboard`: *My dashboard* | `/insights`: *Support dashboard* | `/admin`: *Control centre* |
 | **Demo account** | `lerato@example.com` | `thabo@capaciti.org.za` | `admin@capaciti.org.za` |
@@ -26,7 +26,13 @@ All demo passwords are `Capaciti@2026`. When demo mode is on, the **View as** sw
 | Status transitions | Only: reply on *Waiting* → *In Progress* (automatic), *Resolved* → *Closed* (accept), *Resolved/Closed* → *Reopened* | All moves in the state machine | All, **plus an audited override** of the state machine |
 | Rate a resolved request (1–5 stars) | ✔ | – | – |
 | See your own roadmap and progress | ✔ | – | – |
-| Verify a candidate's milestone requirements | – | ✔ | ✔ |
+| Verify a candidate's stage evidence (exit-criteria checklist) | – | ✔ | ✔ |
+| Approve an official stage decision (one step forward) | – | – | ✔ (facilitators too, for their streams) |
+| Move a candidate back a stage (written reason required) | – | – | ✔ |
+| View the stage audit trail | Own decisions | – | All |
+| Programme pipeline (candidates by stage and stream) | – | – | ✔ |
+| Upload portfolio documents (CV, project, certificate) | ✔ | – | – |
+| AI CV tailoring (optional, needs consent) | ✔ | – | – |
 | Update a candidate's cohort, stream, mentor, Tech Champ, supervisor | – | ✔ | ✔ |
 | See a candidate's accessibility needs | Own | ✔ | ✔ |
 | Support dashboard and analytics (queue, workload, CSAT, trends) | – | ✔ | ✔ |
@@ -36,6 +42,36 @@ All demo passwords are `Capaciti@2026`. When demo mode is on, the **View as** sw
 | Manage request categories (including "blocker" flags) | – | – | ✔ |
 | Run the database enforcement probe | – | – | ✔ |
 | Avatar studio, accessibility settings, language, Cammy | ✔ | ✔ | ✔ (staff have all avatar items unlocked) |
+
+## Facilitator and Recruiter
+
+| | Facilitator | Recruiter |
+|---|---|---|
+| **Who** | Learning facilitators responsible for one or more streams | Talent partners looking for work-ready candidates |
+| **How the account is created** | Created by an admin, who assigns their stream(s) | Created by an admin |
+| **Home page** | `/facilitator`: *My streams* | `/recruiter`: *Recruiter overview* |
+| **Demo account** | `facilitator@capaciti.org.za` (Software Development, Data Science & Analytics, Cybersecurity) | `recruiter@capaciti.org.za` |
+
+| Capability | Facilitator | Recruiter |
+|---|:-:|:-:|
+| See candidates | Only those in their assigned streams (others return 404) | Only candidates who **published** their portfolio |
+| Verify stage evidence (exit-criteria checklist) | ✔ (their streams) | – |
+| Approve the next official stage, with a reason | ✔ (their streams, one step forward only) | – |
+| Move a candidate back a stage | – (admin only) | – |
+| Stage audit trail | Their streams | – |
+| Open portfolio documents | Their streams | Published portfolios only |
+| Private, saved shortlist with notes | – | ✔ (visible only to that recruiter) |
+| Support tickets, analytics, admin | – | – |
+
+### Official stages
+
+Every candidate has one **official stage**: Enrolled → In Training → Work Ready → Placed → Completed.
+
+- A stage changes **only** through a stage decision: who decided, when, and why are stored in the append-only `stage_decisions` trail.
+- Forward decisions move **one step at a time** (no skipping). A decision to the stage the candidate is already at is rejected.
+- **Backward** moves are admin-only and need a written reason (at least 10 characters).
+- Each stage has a checklist of exit criteria. These are **supporting evidence**: ticking them never changes the stage, but when every item is ticked the candidate shows as *Ready for review* to their facilitator.
+- The rules are checked in the API **and** by database triggers, so a raw SQL write can't bypass them.
 
 ## Role walk-throughs
 

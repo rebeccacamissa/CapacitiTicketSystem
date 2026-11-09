@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stage decisions · CAPACITI Support</title>
+  <link rel="icon" href="/assets/logo-mark.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <main id="main" class="opacity-0 space-y-6" data-title="Stage decisions" data-subtitle="Official programme stages" data-easy="Choose a candidate, check their evidence, choose the next stage and write why. Stages move one step at a time. Every decision is saved in the audit trail below.">
+    <div class="grid gap-6 xl:grid-cols-5">
+      <section class="card xl:col-span-2" aria-labelledby="approve-title">
+        <h2 id="approve-title" class="text-lg">Stage approval</h2>
+        <p class="mt-1 text-sm text-white/55">Stages move forward one step at a time: Enrolled, In Training, Work Ready, Placed, Completed. <span id="back-rule"></span></p>
+        <form id="decide" class="mt-4 space-y-4" novalidate>
+          <div><label for="sd-candidate" class="field-label">Candidate</label><select id="sd-candidate" name="candidate" class="field" required></select></div>
+          <div id="sd-current" aria-live="polite"></div>
+          <div><label for="sd-stage" class="field-label">Proposed stage</label><select id="sd-stage" name="toStage" class="field" required></select><p class="field-error" data-error-for="toStage"></p></div>
+          <div><label for="sd-reason" class="field-label">Reason for this decision</label>
+            <textarea id="sd-reason" name="reason" rows="3" maxlength="1000" required class="field" data-voice placeholder="e.g. All assessments passed with 85% attendance; capstone submitted."></textarea>
+            <p class="field-error" data-error-for="reason"></p></div>
+          <div class="flex justify-end"><button class="btn btn-primary btn-shine" id="sd-submit">Approve decision</button></div>
+        </form>
+      </section>
+
+      <section class="card xl:col-span-3" aria-labelledby="trail-title">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div><h2 id="trail-title" class="text-lg">Stage audit trail</h2><p id="trail-scope" class="text-sm text-white/55"></p></div>
+          <div class="flex gap-2">
+            <label class="sr-only" for="trail-search">Search the audit trail</label>
+            <input id="trail-search" type="search" class="field !w-48 !py-1.5 text-sm" placeholder="Search name or reason">
+            <button type="button" id="trail-all" class="btn btn-ghost btn-sm hidden">Show all</button>
+          </div>
+        </div>
+        <ul id="trail" class="stagger mt-4 space-y-2"></ul>
+      </section>
+    </div>
+  </main>
+  <script type="module" src="/js/pages/stage-decisions.js"></script>
+</body>
+</html>

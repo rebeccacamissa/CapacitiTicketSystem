@@ -30,8 +30,9 @@ router.get('/users', (req, res) => {
     LEFT JOIN candidate_profiles cp ON cp.user_id = u.id
     ORDER BY u.role, u.full_name
   `).all();
+  const streams = getDb().prepare('SELECT user_id, stream FROM facilitator_streams ORDER BY stream').all();
   res.json({ users: users.map((u) => ({
-    ...u, is_active: !!u.is_active, must_change_password: !!u.must_change_password,
+    ...u, streams: u.role === 'facilitator' ? streams.filter((s) => s.user_id === u.id).map((s) => s.stream) : undefined, is_active: !!u.is_active, must_change_password: !!u.must_change_password,
     avatar: avatarOf(u), avatar_config: undefined,
   })) });
 });
@@ -46,7 +47,7 @@ router.post(
     firstName: NAME_RULE('First name'),
     surname: NAME_RULE('Surname'),
     email: { type: 'string', required: true, max: 254, pattern: EMAIL_RE, patternMessage: 'Enter a valid email address', label: 'Email' },
-    role: { type: 'enum', required: true, values: ['candidate', 'support', 'admin', 'recruiter'] },
+    role: { type: 'enum', required: true, values: ['candidate', 'support', 'admin', 'recruiter', 'facilitator'] },
     dateOfBirth: DOB_RULE,
     gender: { type: 'enum', values: ['female', 'male', 'non-binary', 'prefer-not'], default: 'prefer-not' },
     position: { type: 'string', max: 80 },
@@ -62,10 +63,22 @@ router.post(
       throw badRequest('Employee ID is required for staff accounts', { fields: { employeeId: 'Employee ID is required for staff' } });
     }
     const tempPassword = people.generateTempPassword();
-    const id = await people.createUser(getDb(), { ...req.body, password: tempPassword, mustChangePassword: true, createdBy: req.user.id });
+    const streams = Array.isArray(req.body.streams) ? req.body.streams.filter((x) => typeof x === 'string') : [];
+    const id = await people.createUser(getDb(), { ...req.body, streams, password: tempPassword, mustChangePassword: true, createdBy: req.user.id });
     res.status(201).json({ id, tempPassword });
   }
 );
+
+/** Assign a facilitator to one or more streams (replaces the current list). */
+router.put('/users/:id/streams', idParam, (req, res) => {
+  const db = getDb();
+  const u = db.prepare('SELECT role FROM users WHERE id = ?').get(req.params.id);
+  if (!u) throw notFound('User not found');
+  if (u.role !== 'facilitator') throw badRequest('Only facilitators are assigned to streams');
+  if (!Array.isArray(req.body?.streams) || req.body.streams.some((x) => typeof x !== 'string')) throw badRequest('streams must be a list of stream names');
+  const streams = transaction(db, () => people.setFacilitatorStreams(db, req.params.id, req.body.streams));
+  res.json({ streams });
+});
 
 router.post('/users/:id/reset-password', idParam, async (req, res) => {
   const db = getDb();
@@ -79,7 +92,7 @@ router.post('/users/:id/reset-password', idParam, async (req, res) => {
 router.patch(
   '/users/:id',
   idParam,
-  validate({ role: { type: 'enum', values: ['candidate', 'support', 'admin', 'recruiter'] }, isActive: { type: 'bool' } }),
+  validate({ role: { type: 'enum', values: ['candidate', 'support', 'admin', 'recruiter', 'facilitator'] }, isActive: { type: 'bool' } }),
   (req, res) => {
     const db = getDb();
     const { id } = req.params;
@@ -117,14 +130,16 @@ router.delete('/users/:id', idParam, (req, res) => {
   const { n } = db.prepare(`
     SELECT (SELECT COUNT(*) FROM requests WHERE candidate_id = ? OR assigned_to = ?)
          + (SELECT COUNT(*) FROM request_messages WHERE author_id = ?)
-         + (SELECT COUNT(*) FROM audit_log WHERE changed_by_user_id = ?) AS n
-  `).get(id, id, id, id);
+         + (SELECT COUNT(*) FROM audit_log WHERE changed_by_user_id = ?)
+         + (SELECT COUNT(*) FROM stage_decisions WHERE candidate_id = ? OR decided_by = ?) AS n
+  `).get(id, id, id, id, id, id);
   if (n > 0) {
     throw conflict('USER_HAS_HISTORY', 'This user has support history that must be kept for the audit trail. Deactivate them instead.');
   }
   transaction(db, () => {
     db.prepare('DELETE FROM candidate_requirement_progress WHERE candidate_id = ?').run(id);
     db.prepare('UPDATE candidate_requirement_progress SET verified_by = NULL WHERE verified_by = ?').run(id);
+    db.prepare('DELETE FROM candidate_stages WHERE candidate_id = ?').run(id);
     db.prepare('DELETE FROM candidate_profiles WHERE user_id = ?').run(id);
     db.prepare('UPDATE candidate_profiles SET updated_by = NULL WHERE updated_by = ?').run(id);
     db.prepare('DELETE FROM staff_profiles WHERE user_id = ?').run(id);

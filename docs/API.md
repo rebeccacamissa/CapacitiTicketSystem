@@ -89,6 +89,35 @@ Recruiter accounts are created or assigned by an administrator. A candidate's po
 | GET | `/recruiter/talent` | Recruiter | Optional `q`, `stream`, `stage` | Published candidate rows and filter options. |
 | GET | `/recruiter/profiles/:id` | Recruiter | – | Published profile, verified programme requirements, and projects. Unpublished profiles return 404. |
 | GET | `/recruiter/portfolios` | Recruiter | – | Published profiles and project evidence. |
+| GET | `/recruiter/shortlist` | Recruiter | – | The signed-in recruiter's private shortlist (published candidates only), with notes. |
+| PUT | `/recruiter/shortlist/:id` | Recruiter | Optional `note` (≤ 500) | Adds or updates a shortlist entry. 404 if the candidate isn't published. |
+| DELETE | `/recruiter/shortlist/:id` | Recruiter | – | Removes the entry. |
+
+Talent rows now carry the **official** `stage` / `stageLabel` (from stage decisions), `shortlisted`, `shortlistNote` and `fileCount`. Profiles include `files` (portfolio documents).
+
+## Official stages (`/stages`)
+
+Stages: `enrolled` → `training` → `work_ready` → `placed` → `completed`. Rules are enforced in the service **and** by triggers (see [DATABASE.md](DATABASE.md)).
+
+| Method | Path | Access | Body / query | Response |
+|---|---|---|---|---|
+| GET | `/stages` | Signed in | – | `{ stages }` in order |
+| GET | `/stages/candidates` | Admin, Facilitator (own streams) | – | Candidates with `stage`, `evidenceDone/Total` for the current stage, `nextStage`, `readyForReview` |
+| GET | `/stages/pipeline` | Admin, Facilitator (own streams) | – | `total`, `byStage`, `awaitingReview`, `byStream` (stream × stage counts) |
+| POST | `/stages/candidates/:id/decisions` | Admin, Facilitator (own streams) | `toStage`, `reason` | `201 { decision, fromStage, toStage, direction }`. Errors: `STAGE_SKIP`, `STAGE_UNCHANGED` (409), `STAGE_BACKWARD_ADMIN_ONLY` (403), 400 if the reason is missing (backward needs ≥ 10 characters), 404 outside the facilitator's streams |
+| GET | `/stages/decisions` | Admin (all), Facilitator (own streams), Candidate (own) | Optional `candidateId`, `limit` | `{ decisions }`: who, when, why, from → to, direction |
+
+## Portfolio documents and AI CV tailoring (`/portfolio`)
+
+| Method | Path | Access | Body | Response |
+|---|---|---|---|---|
+| GET | `/portfolio/files` | Candidate | – | Own files (`kind`: `cv` / `project` / `certificate`) |
+| POST | `/portfolio/files` | Candidate | `kind`, optional `title`, `name`, `data` (base64 data URL) | `201 { file }`. Same checks as ticket attachments: allowed type per kind, magic bytes, 5 MB, max 20 files |
+| DELETE | `/portfolio/files/:id` | Owner | – | `204` |
+| GET | `/portfolio/files/:id` | Owner; support/admin; facilitator for the candidate's stream; recruiter only while published | – | The file, served with a sandbox CSP and `nosniff` (404 otherwise) |
+| GET | `/portfolio/cv/ai-status` | Candidate | – | `{ enabled }` (true when `ANTHROPIC_API_KEY` is set) |
+| POST | `/portfolio/cv/tailor` | Candidate (10 per hour) | `jobTitle`, optional `jobDescription`, `fileId` (own PDF/TXT CV) **or** `cvText`, `consent: true` | `{ result: { tailoredCv, changes[], gapsNotAdded[], honestyNotes, numbersToCheck } }`. Nothing is saved. `503 AI_NOT_CONFIGURED` without a key |
+| POST | `/portfolio/cv/tailored` | Candidate | `title`, `text` (the reviewed, possibly edited draft) | `201 { file }` saved as a text CV with `source: ai_tailored` |
 ## 4. Workflow (`/workflow`): transaction-backed state machine
 
 | Method | Path | Access | Body | Response |
@@ -114,10 +143,10 @@ Recruiter accounts are created or assigned by an administrator. A candidate's po
 
 | Method | Path | Access | Body | Response |
 |---|---|---|---|---|
-| GET | `/progress/me` | Candidate | – | Roadmap: 5 milestones with their requirements, `activeIndex`, `percentComplete`, `blockers` (open tickets in categories flagged as blockers) |
-| GET | `/progress/candidates` | Staff | – | Simple candidate list |
-| GET | `/progress/:candidateId` | Staff | – | That candidate's roadmap |
-| PUT | `/progress/:candidateId/requirements/:requirementId` | Staff | `completed` (boolean) | Updated roadmap. Awards XP and milestone badges and pushes a live update to the candidate. |
+| GET | `/progress/me` | Candidate | – | Roadmap: one node per official stage with its exit criteria, `activeIndex` (= official stage), `stage` (label, since, next, last decision), `readyForReview`, `percentComplete`, `blockers` (open tickets in categories flagged as blockers) |
+| GET | `/progress/candidates` | Support, Admin, Facilitator (own streams) | – | Simple candidate list |
+| GET | `/progress/:candidateId` | Support, Admin, Facilitator (own streams) | – | That candidate's roadmap |
+| PUT | `/progress/:candidateId/requirements/:requirementId` | Support, Admin, Facilitator (own streams) | `completed` (boolean) | Updated roadmap. Awards XP and pushes a live update. **Evidence never changes the official stage**; milestone badges come from stage decisions. |
 
 ## 7. Profiles, people and notifications
 
@@ -142,6 +171,7 @@ Recruiter accounts are created or assigned by an administrator. A candidate's po
 |---|---|---|---|
 | GET | `/admin/users` | – | All users with role, status, temporary-password flag and workload |
 | POST | `/admin/users` | `firstName`, `surname`, `email`, `role`, `dateOfBirth?`, `gender?`. Staff also need `employeeId` (and optionally `position`); candidates take the programme fields. | `201 { id, tempPassword }`. The temporary password is **shown once**, and the user must change it at first sign-in. |
+| PUT | `/admin/users/:id/streams` | `streams` (array of stream names) | `{ streams }`. Facilitators only: the streams they review. Facilitators can also be created with `streams` on `POST /admin/users`. |
 | POST | `/admin/users/:id/reset-password` | – | `{ tempPassword }` |
 | PATCH | `/admin/users/:id` | `role?`, `isActive?` | `{ ok }`. Admins can't demote themselves, and staff with active cases can't be demoted. |
 | DELETE | `/admin/users/:id` | – | `204`. Refused with `409 USER_HAS_HISTORY` if the user has any support history; deactivate them instead. |

@@ -26,6 +26,9 @@
 | **SLA due dates** are in calendar hours | They don't skip weekends or public holidays. |
 | **No password reset by e-mail** | An admin resets passwords, which issues a temporary password. |
 | **Demo mode** | Must be switched off (`ALLOW_DEMO_IN_PRODUCTION=false`) for real users. |
+| **AI CV tailoring** is optional and off by default | Needs an `ANTHROPIC_API_KEY` on the server; each run is a paid API call. The candidate must consent before their CV is sent to Anthropic (POPIA: personal data leaves the platform). The model is instructed never to add skills, numbers or experience, every change is listed with the original wording, gaps are reported instead of added, numbers not in a text CV are flagged, and nothing is saved until the candidate confirms it is true. Even so, **the candidate remains responsible for checking the draft**. Word (.docx) CVs must be uploaded as PDF or pasted as text for tailoring. It was **not tested against the live API** in development (no key was available); the no-key path and the safeguards are covered by tests. |
+| **Stage evidence doesn't gate decisions** | By design, a facilitator can approve a stage with criteria still unticked (the gaps are shown and should be explained in the reason). |
+| **Stream names** | Facilitator scope matches the candidate's stream text exactly. Changing a candidate's stream moves them to a different facilitator. |
 
 ## Future recommendations
 

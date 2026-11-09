@@ -7,69 +7,49 @@ function parseSkills(value) {
   return Array.isArray(skills) ? skills.filter((skill) => typeof skill === 'string') : [];
 }
 
-function stageCandidates(db) {
+/** Published, active candidates with their OFFICIAL stage (set only by audited stage decisions). */
+function stageCandidates(db, recruiterId = null) {
   const rows = db.prepare(`
     SELECT u.id, u.full_name, u.email, u.avatar_config, u.gender, cp.stream, cp.cohort,
            p.headline, p.summary, p.skills, p.github_url, p.cv_url,
-           m.key AS milestone_key, m.title AS milestone_title, m.sort_order,
-           COUNT(mr.id) AS requirement_count, COUNT(progress.requirement_id) AS completed_count
+           COALESCE(cs.stage, 'enrolled') AS stage, ps.label AS stage_label, ps.sort_order AS stage_order,
+           (SELECT COUNT(*) FROM portfolio_files f WHERE f.candidate_id = u.id) AS file_count,
+           s.candidate_id IS NOT NULL AS shortlisted, s.note AS shortlist_note
     FROM users u
     JOIN candidate_profiles cp ON cp.user_id = u.id
     JOIN candidate_portfolios p ON p.candidate_id = u.id AND p.is_published = 1
-    CROSS JOIN milestones m
-    JOIN milestone_requirements mr ON mr.milestone_id = m.id
-    LEFT JOIN candidate_requirement_progress progress
-      ON progress.candidate_id = u.id AND progress.requirement_id = mr.id
+    LEFT JOIN candidate_stages cs ON cs.candidate_id = u.id
+    JOIN programme_stages ps ON ps.key = COALESCE(cs.stage, 'enrolled')
+    LEFT JOIN recruiter_shortlist s ON s.candidate_id = u.id AND s.recruiter_id = ?
     WHERE u.role = 'candidate' AND u.is_active = 1
-    GROUP BY u.id, m.id
-    ORDER BY u.full_name, m.sort_order
-  `).all();
+    ORDER BY u.full_name
+  `).all(recruiterId);
 
-  const candidates = new Map();
-  for (const row of rows) {
-    let candidate = candidates.get(row.id);
-    if (!candidate) {
-      candidate = {
-        id: row.id,
-        fullName: row.full_name,
-        email: row.email,
-        stream: row.stream || '',
-        cohort: row.cohort || '',
-        headline: row.headline,
-        summary: row.summary,
-        skills: parseSkills(row.skills),
-        githubUrl: row.github_url,
-        cvUrl: row.cv_url,
-        avatar: avatarOf({ avatar_config: row.avatar_config, gender: row.gender }),
-        milestones: [],
-      };
-      candidates.set(row.id, candidate);
-    }
-    candidate.milestones.push({
-      key: row.milestone_key,
-      title: row.milestone_title,
-      total: row.requirement_count,
-      completed: row.completed_count,
-    });
-  }
-
-  return [...candidates.values()].map((candidate) => {
-    const workReady = candidate.milestones.some((m) => m.key === 'work_ready' && m.completed === m.total);
-    const placed = candidate.milestones.some((m) => m.key === 'placed' && m.completed === m.total);
-    const current = candidate.milestones.find((m) => m.completed < m.total) || candidate.milestones.at(-1);
-    return {
-      ...candidate,
-      stage: current?.key || '',
-      stageLabel: current?.title || 'Not started',
-      isWorkReady: workReady || placed,
-      isPlaced: placed,
-      milestones: undefined,
-    };
-  });
+  return rows.map((row) => ({
+    id: row.id,
+    fullName: row.full_name,
+    email: row.email,
+    stream: row.stream || '',
+    cohort: row.cohort || '',
+    headline: row.headline,
+    summary: row.summary,
+    skills: parseSkills(row.skills),
+    githubUrl: row.github_url,
+    cvUrl: row.cv_url,
+    avatar: avatarOf({ avatar_config: row.avatar_config, gender: row.gender }),
+    stage: row.stage,
+    stageLabel: row.stage_label,
+    isWorkReady: row.stage_order >= 3,
+    isPlaced: row.stage_order >= 4,
+    fileCount: row.file_count,
+    shortlisted: !!row.shortlisted,
+    shortlistNote: row.shortlist_note || '',
+  }));
 }
 
-function listTalent(db, { q = '', stream = '', stage = '' } = {}) {
-  let candidates = stageCandidates(db);
+function listTalent(db, { q = '', stream = '', stage = '', recruiterId = null, shortlisted = false } = {}) {
+  let candidates = stageCandidates(db, recruiterId);
+  if (shortlisted) candidates = candidates.filter((candidate) => candidate.shortlisted);
   if (q) {
     const term = q.toLocaleLowerCase();
     candidates = candidates.filter((candidate) =>
@@ -81,19 +61,20 @@ function listTalent(db, { q = '', stream = '', stage = '' } = {}) {
   return candidates;
 }
 
-function summary(db) {
-  const candidates = stageCandidates(db);
+function summary(db, recruiterId = null) {
+  const candidates = stageCandidates(db, recruiterId);
   return {
     visibleProfiles: candidates.length,
     workReadyCandidates: candidates.filter((candidate) => candidate.isWorkReady).length,
     placedCandidates: candidates.filter((candidate) => candidate.isPlaced).length,
     activeStreams: new Set(candidates.map((candidate) => candidate.stream).filter(Boolean)).size,
+    shortlisted: candidates.filter((candidate) => candidate.shortlisted).length,
     streams: [...new Set(candidates.map((candidate) => candidate.stream).filter(Boolean))].sort(),
   };
 }
 
-function getPublishedProfile(db, candidateId) {
-  const candidate = stageCandidates(db).find((entry) => entry.id === candidateId);
+function getPublishedProfile(db, candidateId, recruiterId = null) {
+  const candidate = stageCandidates(db, recruiterId).find((entry) => entry.id === candidateId);
   if (!candidate) throw notFound('Published candidate profile not found');
   const verifiedCredentials = db.prepare(`
     SELECT mr.label, m.title AS milestone, progress.completed_at AS verified_at, verifier.full_name AS verified_by
@@ -113,7 +94,8 @@ function getPublishedProfile(db, candidateId) {
     SELECT id, title, description, project_url AS projectUrl, evidence_url AS evidenceUrl
     FROM portfolio_items WHERE candidate_id = ? ORDER BY created_at DESC, id DESC
   `).all(candidateId);
-  return { ...candidate, verifiedCredentials, projects };
+  const files = require('../portfolio/portfolio.service').list(db, candidateId);
+  return { ...candidate, verifiedCredentials, projects, files };
 }
 
 function getOwnPortfolio(db, candidateId) {
@@ -172,4 +154,26 @@ function deleteProject(db, candidateId, projectId) {
   if (!result.changes) throw notFound('Portfolio project not found');
 }
 
-module.exports = { listTalent, summary, getPublishedProfile, getOwnPortfolio, saveOwnPortfolio, addProject, deleteProject };
+// ---- Private shortlist (one per recruiter) -------------------------------------
+function shortlist(db, recruiterId) {
+  return listTalent(db, { recruiterId, shortlisted: true });
+}
+
+function saveToShortlist(db, recruiterId, candidateId, note = '') {
+  if (!stageCandidates(db).some((c) => c.id === candidateId)) throw notFound('Published candidate profile not found');
+  db.prepare(`
+    INSERT INTO recruiter_shortlist (recruiter_id, candidate_id, note) VALUES (?, ?, ?)
+    ON CONFLICT (recruiter_id, candidate_id) DO UPDATE SET note = excluded.note
+  `).run(recruiterId, candidateId, note);
+  return { shortlisted: true, note };
+}
+
+function removeFromShortlist(db, recruiterId, candidateId) {
+  db.prepare('DELETE FROM recruiter_shortlist WHERE recruiter_id = ? AND candidate_id = ?').run(recruiterId, candidateId);
+  return { shortlisted: false };
+}
+
+module.exports = {
+  listTalent, summary, getPublishedProfile, getOwnPortfolio, saveOwnPortfolio, addProject, deleteProject,
+  shortlist, saveToShortlist, removeFromShortlist,
+};

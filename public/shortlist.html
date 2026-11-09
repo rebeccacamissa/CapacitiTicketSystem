@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My shortlist · CAPACITI Support</title>
+  <link rel="icon" href="/assets/logo-mark.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <main id="main" class="opacity-0 space-y-6" data-title="My shortlist" data-subtitle="Recruiter workspace" data-easy="Candidates you saved. Only you can see this list. Add a private note to remember why.">
+    <section class="card">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div><h2 class="text-xl">My shortlist</h2><p class="mt-1 text-sm text-white/55">Private to you. Candidates who stop sharing their portfolio disappear from this list.</p></div>
+        <a href="/talent-board" class="btn btn-ghost">Find more talent</a>
+      </div>
+    </section>
+    <ul id="shortlist" class="stagger grid gap-4 md:grid-cols-2 xl:grid-cols-3"><li class="skeleton h-48"></li><li class="skeleton h-48"></li></ul>
+  </main>
+  <script type="module" src="/js/pages/shortlist.js"></script>
+</body>
+</html>

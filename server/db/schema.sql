@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
   email          TEXT    NOT NULL UNIQUE COLLATE NOCASE,
   password_hash  TEXT    NOT NULL,
   role           TEXT    NOT NULL DEFAULT 'candidate'
-                         CHECK (role IN ('candidate', 'support', 'admin', 'recruiter')),
+                         CHECK (role IN ('candidate', 'support', 'admin', 'recruiter', 'facilitator')),
   is_active      INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
   first_name     TEXT,
   surname        TEXT,
@@ -71,6 +71,38 @@ CREATE TABLE IF NOT EXISTS portfolio_items (
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 CREATE INDEX IF NOT EXISTS idx_portfolio_items_candidate ON portfolio_items(candidate_id);
+
+-- Uploaded portfolio evidence (CV / project / certificate). Same secure storage rules as
+-- ticket attachments: magic-byte checked, random stored names, served sandboxed.
+CREATE TABLE IF NOT EXISTS portfolio_files (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  candidate_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind           TEXT    NOT NULL CHECK (kind IN ('cv', 'project', 'certificate')),
+  title          TEXT    NOT NULL CHECK (length(trim(title)) BETWEEN 1 AND 120),
+  stored_name    TEXT    NOT NULL UNIQUE,
+  original_name  TEXT    NOT NULL CHECK (length(original_name) BETWEEN 1 AND 200),
+  mime           TEXT    NOT NULL,
+  size           INTEGER NOT NULL CHECK (size > 0 AND size <= 5242880),
+  source         TEXT    NOT NULL DEFAULT 'upload' CHECK (source IN ('upload', 'ai_tailored')),
+  created_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_portfolio_files_candidate ON portfolio_files(candidate_id);
+
+-- A recruiter's private, saved shortlist of published candidates.
+CREATE TABLE IF NOT EXISTS recruiter_shortlist (
+  recruiter_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  candidate_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  note          TEXT    NOT NULL DEFAULT '' CHECK (length(note) <= 500),
+  created_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  PRIMARY KEY (recruiter_id, candidate_id)
+);
+
+-- Facilitators approve stage decisions for the stream(s) they are assigned to.
+CREATE TABLE IF NOT EXISTS facilitator_streams (
+  user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  stream   TEXT    NOT NULL CHECK (length(trim(stream)) BETWEEN 1 AND 80),
+  PRIMARY KEY (user_id, stream)
+);
 
 CREATE TABLE IF NOT EXISTS staff_profiles (
   user_id      INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -256,6 +288,39 @@ CREATE TABLE IF NOT EXISTS candidate_requirement_progress (
   PRIMARY KEY (candidate_id, requirement_id)
 );
 
+-- ---------------------------------------------------------------------
+-- Official programme stages: Enrolled -> In Training -> Work Ready -> Placed -> Completed.
+-- The requirement checklists above are supporting evidence; the official stage only
+-- changes through an audited stage decision, enforced by the triggers further down.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS programme_stages (
+  key         TEXT    PRIMARY KEY,
+  label       TEXT    NOT NULL,
+  sort_order  INTEGER NOT NULL UNIQUE
+);
+
+-- Current official stage. A missing row means 'enrolled'.
+CREATE TABLE IF NOT EXISTS candidate_stages (
+  candidate_id  INTEGER PRIMARY KEY REFERENCES users(id),
+  stage         TEXT    NOT NULL REFERENCES programme_stages(key),
+  updated_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+-- Append-only stage audit trail: who decided, when, and why.
+CREATE TABLE IF NOT EXISTS stage_decisions (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  candidate_id  INTEGER NOT NULL REFERENCES users(id),
+  from_stage    TEXT    REFERENCES programme_stages(key),   -- NULL only for an initial placement
+  to_stage      TEXT    NOT NULL REFERENCES programme_stages(key),
+  direction     TEXT    NOT NULL CHECK (direction IN ('initial', 'forward', 'backward')),
+  decided_by    INTEGER REFERENCES users(id),               -- NULL only for system 'initial' rows
+  reason        TEXT    NOT NULL CHECK (length(trim(reason)) BETWEEN 3 AND 1000),
+  created_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  CHECK ((from_stage IS NULL) = (direction = 'initial')),
+  CHECK (direction = 'initial' OR decided_by IS NOT NULL)
+);
+CREATE INDEX IF NOT EXISTS idx_stage_decisions_candidate ON stage_decisions(candidate_id);
+
 -- =====================================================================
 -- TRIGGERS — database-level state machine
 -- =====================================================================
@@ -333,6 +398,88 @@ BEGIN
   SELECT RAISE(ABORT, 'AUDIT_LOG_IMMUTABLE: audit entries cannot be deleted');
 END;
 
+-- ---------------------------------------------------------------------
+-- Stage decision rules (database-enforced, like the ticket workflow)
+-- ---------------------------------------------------------------------
+CREATE TRIGGER IF NOT EXISTS trg_stage_decision_guard
+BEFORE INSERT ON stage_decisions
+BEGIN
+  -- An initial placement (data import) is only allowed before the candidate has a stage row.
+  SELECT RAISE(ABORT, 'STAGE_ALREADY_SET: candidate already has an official stage')
+  WHERE NEW.direction = 'initial'
+    AND EXISTS (SELECT 1 FROM candidate_stages WHERE candidate_id = NEW.candidate_id);
+
+  SELECT RAISE(ABORT, 'STAGE_UNCHANGED: candidate is already at this stage')
+  WHERE NEW.direction <> 'initial'
+    AND NEW.to_stage = COALESCE((SELECT stage FROM candidate_stages WHERE candidate_id = NEW.candidate_id), 'enrolled');
+
+  SELECT RAISE(ABORT, 'STAGE_STALE: the decision does not start from the current stage')
+  WHERE NEW.direction <> 'initial'
+    AND NEW.from_stage IS NOT COALESCE((SELECT stage FROM candidate_stages WHERE candidate_id = NEW.candidate_id), 'enrolled');
+
+  SELECT RAISE(ABORT, 'STAGE_SKIP: stages move forward one step at a time')
+  WHERE NEW.direction = 'forward'
+    AND (SELECT sort_order FROM programme_stages WHERE key = NEW.to_stage)
+        <> (SELECT sort_order FROM programme_stages WHERE key = NEW.from_stage) + 1;
+
+  SELECT RAISE(ABORT, 'STAGE_DIRECTION: a backward decision must move to an earlier stage')
+  WHERE NEW.direction = 'backward'
+    AND (SELECT sort_order FROM programme_stages WHERE key = NEW.to_stage)
+        >= (SELECT sort_order FROM programme_stages WHERE key = NEW.from_stage);
+
+  SELECT RAISE(ABORT, 'STAGE_BACKWARD_ADMIN_ONLY: only an administrator can move a candidate back a stage')
+  WHERE NEW.direction = 'backward'
+    AND NOT EXISTS (SELECT 1 FROM users WHERE id = NEW.decided_by AND role = 'admin' AND is_active = 1);
+
+  -- Forward: an active admin, or an active facilitator assigned to the candidate's stream.
+  SELECT RAISE(ABORT, 'STAGE_NOT_AUTHORISED: only an admin or the stream facilitator can approve this stage')
+  WHERE NEW.direction = 'forward'
+    AND NOT EXISTS (SELECT 1 FROM users WHERE id = NEW.decided_by AND role = 'admin' AND is_active = 1)
+    AND NOT EXISTS (
+          SELECT 1 FROM users u
+          JOIN facilitator_streams fs ON fs.user_id = u.id
+          JOIN candidate_profiles cp ON cp.user_id = NEW.candidate_id AND cp.stream = fs.stream
+          WHERE u.id = NEW.decided_by AND u.role = 'facilitator' AND u.is_active = 1);
+END;
+
+-- The official stage may only change to what the latest audited decision says.
+CREATE TRIGGER IF NOT EXISTS trg_candidate_stage_insert
+BEFORE INSERT ON candidate_stages
+BEGIN
+  SELECT RAISE(ABORT, 'STAGE_AUDIT_REQUIRED: stage change has no matching stage decision')
+  WHERE NEW.stage <> 'enrolled'
+    AND NOT EXISTS (
+          SELECT 1 FROM stage_decisions d
+          WHERE d.id = (SELECT MAX(id) FROM stage_decisions WHERE candidate_id = NEW.candidate_id)
+            AND d.to_stage = NEW.stage);
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_candidate_stage_guard
+BEFORE UPDATE OF stage ON candidate_stages
+BEGIN
+  SELECT RAISE(ABORT, 'STAGE_UNCHANGED: candidate is already at this stage')
+  WHERE OLD.stage = NEW.stage;
+
+  SELECT RAISE(ABORT, 'STAGE_AUDIT_REQUIRED: stage change has no matching stage decision')
+  WHERE NOT EXISTS (
+          SELECT 1 FROM stage_decisions d
+          WHERE d.id = (SELECT MAX(id) FROM stage_decisions WHERE candidate_id = NEW.candidate_id)
+            AND d.from_stage = OLD.stage
+            AND d.to_stage = NEW.stage);
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_stage_decisions_no_update
+BEFORE UPDATE ON stage_decisions
+BEGIN
+  SELECT RAISE(ABORT, 'AUDIT_LOG_IMMUTABLE: stage decisions cannot be modified');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_stage_decisions_no_delete
+BEFORE DELETE ON stage_decisions
+BEGIN
+  SELECT RAISE(ABORT, 'AUDIT_LOG_IMMUTABLE: stage decisions cannot be deleted');
+END;
+
 -- =====================================================================
 -- REFERENCE DATA
 -- =====================================================================
@@ -370,23 +517,29 @@ INSERT OR IGNORE INTO categories (name, description, is_blocker) VALUES
   ('General enquiry',          'Anything else', 0),
   ('Accessibility support',    'Assistive technology, SASL interpreters, extra time and other accommodations', 1);
 
+INSERT OR IGNORE INTO programme_stages (key, label, sort_order) VALUES
+  ('enrolled', 'Enrolled', 1), ('training', 'In Training', 2), ('work_ready', 'Work Ready', 3),
+  ('placed', 'Placed', 4), ('completed', 'Completed', 5);
+
+-- One roadmap milestone per official stage. Its requirements are the stage's exit
+-- criteria: supporting evidence a facilitator reviews before approving the next stage.
 INSERT OR IGNORE INTO milestones (key, title, description, sort_order) VALUES
-  ('screening',  'Application & Screening',      'Your application is reviewed and you complete the screening steps.', 1),
-  ('onboarding', 'Enrolled & Onboarding',        'You are accepted into a cohort and set up for training.', 2),
-  ('training',   'In Training & Active Support', 'You attend training, complete modules and pass assessments.', 3),
-  ('work_ready', 'Work Ready',                   'You are prepared and signed off for the workplace.', 4),
-  ('placed',     'Corporate Internship Placed',  'You start your internship with a corporate partner.', 5);
+  ('enrolled',   'Enrolled',    'You are accepted into a cohort and set up for training.', 1),
+  ('training',   'In Training', 'You attend training, complete modules and pass assessments.', 2),
+  ('work_ready', 'Work Ready',  'You are prepared for the workplace and matched with a corporate partner.', 3),
+  ('placed',     'Placed',      'You are on your internship with a corporate partner.', 4),
+  ('completed',  'Completed',   'You have finished your internship and completed the programme.', 5);
 
 INSERT OR IGNORE INTO milestone_requirements (milestone_id, label, sort_order)
 SELECT m.id, r.label, r.ord FROM milestones m JOIN (
-  SELECT 'screening' k, 'Application form submitted' label, 1 ord UNION ALL
-  SELECT 'screening', 'Supporting documents verified', 2 UNION ALL
-  SELECT 'screening', 'Aptitude assessment completed', 3 UNION ALL
-  SELECT 'screening', 'Screening interview completed', 4 UNION ALL
-  SELECT 'onboarding', 'Offer accepted and contract signed', 1 UNION ALL
-  SELECT 'onboarding', 'Learning platform account activated', 2 UNION ALL
-  SELECT 'onboarding', 'Device and connectivity set up', 3 UNION ALL
-  SELECT 'onboarding', 'Orientation session attended', 4 UNION ALL
+  SELECT 'enrolled' k, 'Application form submitted' label, 1 ord UNION ALL
+  SELECT 'enrolled', 'Supporting documents verified', 2 UNION ALL
+  SELECT 'enrolled', 'Aptitude assessment completed', 3 UNION ALL
+  SELECT 'enrolled', 'Screening interview completed', 4 UNION ALL
+  SELECT 'enrolled', 'Offer accepted and contract signed', 5 UNION ALL
+  SELECT 'enrolled', 'Learning platform account activated', 6 UNION ALL
+  SELECT 'enrolled', 'Device and connectivity set up', 7 UNION ALL
+  SELECT 'enrolled', 'Orientation session attended', 8 UNION ALL
   SELECT 'training', 'Core modules completed', 1 UNION ALL
   SELECT 'training', 'Attendance at or above 80%', 2 UNION ALL
   SELECT 'training', 'All assessments passed', 3 UNION ALL
@@ -394,7 +547,9 @@ SELECT m.id, r.label, r.ord FROM milestones m JOIN (
   SELECT 'work_ready', 'CV reviewed and approved', 1 UNION ALL
   SELECT 'work_ready', 'Mock interview completed', 2 UNION ALL
   SELECT 'work_ready', 'Work-readiness workshop attended', 3 UNION ALL
-  SELECT 'placed', 'Matched with a corporate partner', 1 UNION ALL
-  SELECT 'placed', 'Internship agreement signed', 2 UNION ALL
-  SELECT 'placed', 'First day at host company', 3
+  SELECT 'work_ready', 'Matched with a corporate partner', 4 UNION ALL
+  SELECT 'work_ready', 'Internship agreement signed', 5 UNION ALL
+  SELECT 'placed', 'First day at host company', 1 UNION ALL
+  SELECT 'placed', 'Internship completed', 2 UNION ALL
+  SELECT 'placed', 'Completion certificate issued', 3
 ) r ON r.k = m.key;

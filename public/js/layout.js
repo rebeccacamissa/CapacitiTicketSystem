@@ -9,14 +9,15 @@ import { t, translateDom, LANGS, getLang, loadLanguage, setLanguage } from './i1
 import { applyA11y, announce, initShortcuts, initVoiceInput, openA11yPanel } from './a11y.js';
 
 export { icon };
-export const HOME = { candidate: '/dashboard', support: '/insights', admin: '/admin', recruiter: '/recruiter' };
-const ROLE_LABEL_EN = { candidate: 'Candidate', support: 'Support / Manager', admin: 'Administrator', recruiter: 'Recruiter' };
+export const HOME = { candidate: '/dashboard', support: '/insights', admin: '/admin', recruiter: '/recruiter', facilitator: '/facilitator' };
+const ROLE_LABEL_EN = { candidate: 'Candidate', support: 'Support / Manager', admin: 'Administrator', recruiter: 'Recruiter', facilitator: 'Facilitator' };
 export const ROLE_LABEL = new Proxy(ROLE_LABEL_EN, { get: (o, k) => t(o[k]) });
 const ROLE_BLURB = {
   candidate: 'Your journey, requests and profile',
   support: 'Ticket queue, workload and candidate records',
   admin: 'Users, roles, categories and analytics',
   recruiter: 'Shared candidate talent and portfolios',
+  facilitator: 'Stage reviews and evidence for your streams',
 };
 
 const NAV = {
@@ -34,12 +35,18 @@ const NAV = {
   ],
   admin: [
     ['Dashboards', [['/admin', 'Control centre', 'shield'], ['/insights', 'Support analytics', 'chart']]],
-    ['Work', [['/requests', 'All requests', 'ticket'], ['/candidates', 'Candidates', 'users']]],
+    ['Work', [['/requests', 'All requests', 'ticket'], ['/candidates', 'Candidates', 'users'], ['/stage-decisions', 'Stage decisions', 'flag']]],
     ['Community', [['/feed', 'Cohort feed', 'megaphone']]],
     ['Me', [['/profile', 'Profile & avatar', 'user']]],
   ],
   recruiter: [
-    ['Recruiter workspace', [['/recruiter', 'Overview', 'home'], ['/talent-board', 'Talent board', 'search'], ['/candidate-profiles', 'Candidate profiles', 'users'], ['/portfolios', 'Portfolios', 'folder']]],
+    ['Recruiter workspace', [['/recruiter', 'Overview', 'home'], ['/talent-board', 'Talent board', 'search'], ['/candidate-profiles', 'Candidate profiles', 'users'], ['/portfolios', 'Portfolios', 'folder'], ['/shortlist', 'My shortlist', 'star']]],
+  ],
+  facilitator: [
+    ['Dashboard', [['/facilitator', 'My streams', 'home']]],
+    ['Reviews', [['/stage-decisions', 'Stage approvals', 'flag'], ['/candidates', 'Candidate evidence', 'users']]],
+    ['Community', [['/feed', 'Cohort feed', 'megaphone']]],
+    ['Me', [['/profile', 'Profile & avatar', 'user']]],
   ],
 };
 
@@ -131,12 +138,12 @@ function buildShell(user, demoMode) {
       <nav class="mt-4 flex-1 overflow-y-auto pl-3 -ml-3" aria-label="Main" data-tour="nav">${navHtml}</nav>
       <div class="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-2.5">
         <a href="/profile#avatar" aria-label="${t('Edit your avatar')}" data-side-avatar>${avatarHtml({ name: user.fullName, avatar: user.avatar, id: user.id }, 'h-10 w-10 text-sm', 'transition hover:scale-110')}</a>
-        <div class="min-w-0 flex-1"><p class="truncate text-sm font-semibold">${esc(user.fullName)}</p><p class="truncate text-xs text-white/50">${esc(user.email)}</p>${user.role === 'recruiter' ? '<p class="mt-0.5 text-[0.6rem] font-semibold tracking-wider text-salmon-50">ROLE / RECRUITER</p>' : ''}</div>
+        <div class="min-w-0 flex-1"><p class="truncate text-sm font-semibold">${esc(user.fullName)}</p><p class="truncate text-xs text-white/50">${esc(user.email)}</p>${['recruiter', 'facilitator'].includes(user.role) ? `<p class="mt-0.5 text-[0.6rem] font-semibold tracking-wider text-salmon-50">ROLE / ${user.role.toUpperCase()}</p>` : ''}</div>
         <button type="button" data-logout class="rounded-xl p-2 text-white/60 transition hover:bg-salmon/20 hover:text-salmon-50" aria-label="${t('Sign out')}" title="${t('Sign out')}">${icon('logout')}</button>
       </div>
     </div>`;
 
-  const demoBtns = (cls) => ['candidate', 'support', 'admin', 'recruiter'].map((r) => `<button type="button" data-demo-role="${r}" aria-pressed="${r === user.role}" class="${cls} ${r === user.role ? 'bg-gradient-to-r from-purple to-salmon text-snow shadow' : 'text-white/60 hover:bg-white/10 hover:text-white'}">${t({ candidate: 'Candidate', support: 'Manager', admin: 'Admin', recruiter: 'Recruiter' }[r])}</button>`).join('');
+  const demoBtns = (cls) => ['candidate', 'support', 'admin', 'recruiter', 'facilitator'].map((r) => `<button type="button" data-demo-role="${r}" aria-pressed="${r === user.role}" class="${cls} ${r === user.role ? 'bg-gradient-to-r from-purple to-salmon text-snow shadow' : 'text-white/60 hover:bg-white/10 hover:text-white'}">${t({ candidate: 'Candidate', support: 'Manager', admin: 'Admin', recruiter: 'Recruiter', facilitator: 'Facilitator' }[r])}</button>`).join('');
 
   const shell = document.createElement('div');
   shell.innerHTML = `
@@ -153,7 +160,7 @@ function buildShell(user, demoMode) {
             <p class="hidden truncate text-xs text-white/50 sm:block"><span data-clock>${esc(subtitle)}</span>
               <span class="ml-2 inline-flex items-center gap-1 align-middle" data-live title="${t('Live updates')}"><span class="h-1.5 w-1.5 rounded-full bg-white/30" data-live-dot></span><span data-live-text>${t('Connecting')}</span></span></p>
           </div>
-          ${user.role !== 'recruiter' ? `<button type="button" data-tour="search" data-open-palette class="hidden items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/55 transition hover:border-white/25 hover:text-white md:flex" aria-label="${t('Search')} (Ctrl+K)">
+          ${!['recruiter', 'facilitator'].includes(user.role) ? `<button type="button" data-tour="search" data-open-palette class="hidden items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/55 transition hover:border-white/25 hover:text-white md:flex" aria-label="${t('Search')} (Ctrl+K)">
             ${icon('search', 'h-4 w-4')}<span>${t('Search')}</span><kbd class="ml-3 rounded-md border border-white/15 px-1.5 text-[0.65rem]">Ctrl K</kbd>
           </button>
           <button type="button" data-open-palette class="rounded-xl p-2.5 text-white/80 hover:bg-white/10 md:hidden" aria-label="${t('Search')}">${icon('search')}</button>` : ''}
@@ -200,7 +207,7 @@ function buildShell(user, demoMode) {
   initVoiceInput();
   initShortcuts(user, {
     home: HOME[user.role],
-    palette: user.role === 'recruiter' ? () => {} : togglePalette,
+    palette: ['recruiter', 'facilitator'].includes(user.role) ? () => {} : togglePalette,
     cammy: () => document.getElementById('cammy-toggle')?.click(),
     theme: () => document.getElementById('theme-toggle').click(),
     a11y: () => document.getElementById('a11y-btn').click(),

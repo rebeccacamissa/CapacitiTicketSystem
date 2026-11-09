@@ -1,6 +1,9 @@
 import { api } from '../api.js';
 import { initPage } from '../layout.js';
 import { esc, toast, avatarHtml, fmtDate } from '../ui.js';
+import { icon } from '../icons.js';
+import { shortlistButton, wireShortlist } from '../components/shortlist.js';
+import { stageBadge } from '../components/stage-ui.js';
 
 await initPage({ roles: ['recruiter'] });
 const list = document.getElementById('profile-list');
@@ -37,8 +40,8 @@ async function selectCandidate(id) {
       <div class="relative flex flex-wrap items-center gap-4">
         ${avatarHtml({ name: profile.fullName, avatar: profile.avatar, id: profile.id }, 'h-16 w-16 text-xl')}
         <div class="min-w-0 flex-1"><h2 class="text-2xl">${esc(profile.fullName)}</h2><p class="text-sm text-white/65">${esc(profile.email)}</p>
-          <div class="mt-2 flex flex-wrap gap-2">${profile.stream ? `<span class="chip">${esc(profile.stream)}</span>` : ''}${profile.cohort ? `<span class="chip">${esc(profile.cohort)}</span>` : ''}<span class="chip">${esc(profile.stageLabel)}</span></div>
-        </div>${links ? `<div class="flex gap-2">${links}</div>` : ''}
+          <div class="mt-2 flex flex-wrap gap-2">${profile.stream ? `<span class="chip">${esc(profile.stream)}</span>` : ''}${profile.cohort ? `<span class="chip">${esc(profile.cohort)}</span>` : ''}${stageBadge(profile.stage, profile.stageLabel)}</div>
+        </div><div class="flex flex-wrap gap-2">${links}${shortlistButton(profile)}</div>
       </div>
       ${profile.headline ? `<h3 class="relative mt-5 text-lg font-semibold">${esc(profile.headline)}</h3>` : ''}
       ${profile.summary ? `<p class="relative mt-2 whitespace-pre-wrap text-sm leading-relaxed text-white/70">${esc(profile.summary)}</p>` : ''}
@@ -56,6 +59,14 @@ async function selectCandidate(id) {
           <div class="mt-2 flex gap-3 text-xs">${project.projectUrl ? `<a class="text-salmon-50 hover:underline" href="${esc(project.projectUrl)}" target="_blank" rel="noopener noreferrer">Project link</a>` : ''}
             ${project.evidenceUrl ? `<a class="text-salmon-50 hover:underline" href="${esc(project.evidenceUrl)}" target="_blank" rel="noopener noreferrer">Evidence</a>` : ''}</div></li>`).join('')}</ul>`
       : '<p class="mt-2 text-sm text-white/50">No project evidence has been shared yet.</p>'}
+    </section>
+    <section class="card"><h3 class="text-lg">Documents</h3>
+      ${profile.files?.length ? `<ul class="mt-3 grid gap-2 sm:grid-cols-2">${profile.files.map((f) => `
+        <li><a href="/api/portfolio/files/${f.id}" target="_blank" rel="noopener" class="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3 transition hover:bg-white/[0.08]">
+          <span class="text-salmon-50">${icon(f.mime.startsWith('image/') ? 'image' : 'file', 'h-5 w-5')}</span>
+          <span class="min-w-0 flex-1"><span class="block truncate text-sm font-medium">${esc(f.title)}</span><span class="block text-xs text-white/50">${esc({ cv: 'CV', project: 'Project', certificate: 'Certificate' }[f.kind])}${f.source === 'ai_tailored' ? ' · AI-tailored, reviewed by the candidate' : ''} · ${fmtDate(f.createdAt)}</span></span>
+          ${icon('download', 'h-4 w-4 text-white/50')}</a></li>`).join('')}</ul>`
+      : '<p class="mt-2 text-sm text-white/50">No documents have been shared yet.</p>'}
     </section>`;
 }
 
@@ -66,6 +77,7 @@ list.addEventListener('click', async (event) => {
   catch (error) { toast(error.message, 'error'); }
 });
 search.addEventListener('input', renderList);
+wireShortlist(detail, (id) => selectCandidate(id));
 
 try {
   ({ candidates } = await api('/recruiter/talent'));

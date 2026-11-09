@@ -136,14 +136,16 @@ test('audit log is immutable', () => {
   assert.throws(() => db.prepare("UPDATE audit_log SET details = 'x'").run(), /AUDIT_LOG_IMMUTABLE/);
 });
 
-test('roadmap active node advances as requirements are verified', async () => {
+test('verified evidence marks a stage ready for review but never moves the official stage', async () => {
   const cand = db.prepare("SELECT id FROM users WHERE email = 'c1@t.test'").get().id;
-  const reqs = db.prepare("SELECT mr.id FROM milestone_requirements mr JOIN milestones m ON m.id = mr.milestone_id WHERE m.key = 'screening'").all();
+  const reqs = db.prepare("SELECT mr.id FROM milestone_requirements mr JOIN milestones m ON m.id = mr.milestone_id WHERE m.key = 'enrolled'").all();
   let last;
   for (const r of reqs) last = await call('support', 'PUT', `/progress/${cand}/requirements/${r.id}`, { completed: true });
-  assert.equal(last.body.activeIndex, 1);
-  assert.equal(last.body.milestones[0].state, 'completed');
-  assert.ok(last.body.milestones[0].achievedAt);
+  assert.equal(last.status, 200);
+  assert.equal(last.body.activeIndex, 0);
+  assert.equal(last.body.stage.key, 'enrolled');
+  assert.equal(last.body.readyForReview, true);
+  assert.equal(last.body.milestones[0].completedCount, last.body.milestones[0].totalCount);
   assert.equal((await call('cand', 'PUT', `/progress/${cand}/requirements/${reqs[0].id}`, { completed: false })).status, 403);
 });
 

@@ -28,6 +28,15 @@ function generateTempPassword() {
   return chars.join('');
 }
 
+/** Replace a facilitator's stream assignments (names must be known streams). */
+function setFacilitatorStreams(db, userId, streams) {
+  const known = require('../../config/options').streams;
+  const clean = [...new Set(streams)].filter((s) => known.includes(s));
+  db.prepare('DELETE FROM facilitator_streams WHERE user_id = ?').run(userId);
+  for (const s of clean) db.prepare('INSERT INTO facilitator_streams (user_id, stream) VALUES (?, ?)').run(userId, s);
+  return clean;
+}
+
 async function createUser(db, u) {
   const email = u.email.toLowerCase();
   if (db.prepare('SELECT 1 FROM users WHERE email = ?').get(email)) {
@@ -51,6 +60,7 @@ async function createUser(db, u) {
       db.prepare('INSERT INTO staff_profiles (user_id, position, employee_id) VALUES (?, ?, ?)')
         .run(id, u.position || null, u.employeeId || null);
     }
+    if (u.role === 'facilitator') setFacilitatorStreams(db, id, u.streams || []);
     return id;
   });
 }
@@ -66,7 +76,9 @@ function getProfile(db, userId) {
     WHERE u.id = ?
   `).get(userId);
   if (!u) throw notFound('User not found');
-  return shapeProfile(u);
+  const out = shapeProfile(u);
+  if (u.role === 'facilitator') out.staff.streams = db.prepare('SELECT stream FROM facilitator_streams WHERE user_id = ? ORDER BY stream').all(userId).map((r) => r.stream);
+  return out;
 }
 
 function shapeProfile(u) {
@@ -169,6 +181,18 @@ function notifications(db, user) {
 
   if (user.role === 'recruiter') return items;
 
+  if (user.role === 'facilitator') {
+    const ready = require('../stages/stage.service').candidates(db, user).filter((c) => c.readyForReview);
+    if (ready.length) items.push({ type: 'review', tone: 'info', title: `${ready.length} candidate${ready.length > 1 ? 's' : ''} ready for a stage review`, tkey: 'Candidates ready for a stage review: {n}', bkey: 'Every exit criterion for their current stage is evidenced.', vars: { n: ready.length }, body: 'Every exit criterion for their current stage is evidenced.', href: '/stage-decisions' });
+    return items;
+  }
+
+  if (user.role === 'candidate') {
+    const last = db.prepare(`SELECT d.to_stage, d.direction, ps.label, d.created_at FROM stage_decisions d JOIN programme_stages ps ON ps.key = d.to_stage
+      WHERE d.candidate_id = ? AND d.direction <> 'initial' AND d.created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-7 days') ORDER BY d.id DESC LIMIT 1`).get(user.id);
+    if (last) items.push({ type: 'stage', tone: last.direction === 'forward' ? 'ok' : 'warn', title: `Your official stage is now ${last.label}`, tkey: 'Your official stage is now {stage}', vars: { stage: last.label }, body: 'Open your roadmap to see the decision.', bkey: 'Open your roadmap to see the decision.', href: '/dashboard#roadmap' });
+  }
+
   if (user.role === 'candidate') {
     const waiting = db.prepare("SELECT id, reference, title FROM requests WHERE candidate_id = ? AND status = 'Waiting for Candidate'").all(user.id);
     for (const r of waiting) items.push({ type: 'action', tone: 'warn', title: `${r.reference} needs your reply`, tkey: '{ref} needs your reply', vars: { ref: r.reference }, body: r.title, href: `/request?id=${r.id}` });
@@ -190,6 +214,6 @@ function notifications(db, user) {
 }
 
 module.exports = {
-  generateTempPassword, createUser, getProfile, updateCandidateProfile,
+  generateTempPassword, createUser, setFacilitatorStreams, getProfile, updateCandidateProfile,
   birthdays, birthdayInfo, notifications,
 };

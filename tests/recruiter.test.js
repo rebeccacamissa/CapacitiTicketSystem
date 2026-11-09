@@ -142,7 +142,7 @@ test('candidates can publish their own portfolios and recruiters can read only t
   assert.equal(board.status, 200);
   assert.equal(board.body.candidates.length, 1);
   assert.equal(board.body.candidates[0].fullName, 'Candidate User');
-  assert.equal(board.body.candidates[0].stage, 'screening');
+  assert.equal(board.body.candidates[0].stage, 'enrolled');
 
   const profile = await call('recruiter', 'GET', `/recruiter/profiles/${ids.candidate}`);
   assert.equal(profile.status, 200);

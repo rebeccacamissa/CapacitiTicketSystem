@@ -47,7 +47,7 @@ router.delete('/me/projects/:projectId', authorize('candidate'), projectId, (req
   res.status(204).end();
 });
 
-router.get('/summary', authorize('recruiter'), (req, res) => res.json(svc.summary(getDb())));
+router.get('/summary', authorize('recruiter'), (req, res) => res.json(svc.summary(getDb(), req.user.id)));
 
 router.get(
   '/talent',
@@ -59,9 +59,9 @@ router.get(
   }, 'query'),
   (req, res) => {
     const data = svc.summary(getDb());
-    const stages = getDb().prepare('SELECT key, title FROM milestones ORDER BY sort_order').all();
+    const stages = getDb().prepare('SELECT key, label AS title FROM programme_stages ORDER BY sort_order').all();
     res.json({
-      candidates: svc.listTalent(getDb(), req.validQuery),
+      candidates: svc.listTalent(getDb(), { ...req.validQuery, recruiterId: req.user.id }),
       streams: data.streams,
       stages,
     });
@@ -69,11 +69,11 @@ router.get(
 );
 
 router.get('/profiles/:id', authorize('recruiter'), candidateId, (req, res) => {
-  res.json({ profile: svc.getPublishedProfile(getDb(), req.params.id) });
+  res.json({ profile: svc.getPublishedProfile(getDb(), req.params.id, req.user.id) });
 });
 
 router.get('/portfolios', authorize('recruiter'), (req, res) => {
-  const candidates = svc.listTalent(getDb(), {});
+  const candidates = svc.listTalent(getDb(), { recruiterId: req.user.id });
   const projects = getDb().prepare(`
     SELECT id, candidate_id AS candidateId, title, description,
            project_url AS projectUrl, evidence_url AS evidenceUrl
@@ -86,5 +86,18 @@ router.get('/portfolios', authorize('recruiter'), (req, res) => {
     })),
   });
 });
+
+// ---- Private shortlist: only the recruiter who saved it can see it ------------------
+router.get('/shortlist', authorize('recruiter'), (req, res) => res.json({ candidates: svc.shortlist(getDb(), req.user.id) }));
+
+router.put(
+  '/shortlist/:id',
+  authorize('recruiter'),
+  candidateId,
+  validate({ note: { type: 'string', max: 500, label: 'Note' } }),
+  (req, res) => res.json(svc.saveToShortlist(getDb(), req.user.id, req.params.id, req.body.note || ''))
+);
+
+router.delete('/shortlist/:id', authorize('recruiter'), candidateId, (req, res) => res.json(svc.removeFromShortlist(getDb(), req.user.id, req.params.id)));
 
 module.exports = router;

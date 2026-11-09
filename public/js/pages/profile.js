@@ -142,6 +142,10 @@ if (user.role === 'candidate') {
       toast('Project removed', 'success');
     } catch (err) { toast(err.message, 'error'); }
   });
+
+  const { initPortfolioDocs, initCvTailor } = await import('../components/portfolio-docs.js');
+  await initPortfolioDocs(document.getElementById('portfolio-docs'));
+  await initCvTailor(document.getElementById('cv-tailor'));
 }
 
 form.addEventListener('submit', async (e) => {

@@ -25,6 +25,15 @@ erDiagram
     milestones ||--o{ milestone_requirements : contains
     milestone_requirements ||--o{ candidate_requirement_progress : "completed in"
     users ||--o{ candidate_requirement_progress : "progress of"
+    programme_stages ||--o{ candidate_stages : "current stage"
+    users ||--o| candidate_stages : "official stage of"
+    users ||--o{ stage_decisions : "decided for / decided by"
+    programme_stages ||--o{ stage_decisions : "from / to"
+    users ||--o{ facilitator_streams : "facilitates"
+    users ||--o| candidate_portfolios : publishes
+    users ||--o{ portfolio_items : "project links"
+    users ||--o{ portfolio_files : "CV / project / certificate"
+    users ||--o{ recruiter_shortlist : "shortlists (recruiter / candidate)"
     users ||--o{ xp_events : earns
     users ||--o{ user_badges : holds
     users ||--o{ feed_posts : "author / subject"
@@ -190,6 +199,45 @@ erDiagram
         INTEGER user_id PK,FK
         TEXT reaction PK
     }
+    programme_stages {
+        TEXT key PK
+        TEXT label
+        INTEGER sort_order UK
+    }
+    candidate_stages {
+        INTEGER candidate_id PK,FK
+        TEXT stage FK
+        TEXT updated_at
+    }
+    stage_decisions {
+        INTEGER id PK
+        INTEGER candidate_id FK
+        TEXT from_stage FK
+        TEXT to_stage FK
+        TEXT direction "initial | forward | backward"
+        INTEGER decided_by FK
+        TEXT reason
+        TEXT created_at
+    }
+    facilitator_streams {
+        INTEGER user_id PK,FK
+        TEXT stream PK
+    }
+    portfolio_files {
+        INTEGER id PK
+        INTEGER candidate_id FK
+        TEXT kind "cv | project | certificate"
+        TEXT title
+        TEXT stored_name UK
+        TEXT mime
+        INTEGER size
+        TEXT source "upload | ai_tailored"
+    }
+    recruiter_shortlist {
+        INTEGER recruiter_id PK,FK
+        INTEGER candidate_id PK,FK
+        TEXT note
+    }
 ```
 
 > GitHub renders this Mermaid diagram automatically. To export a PNG, paste it into [mermaid.live](https://mermaid.live).
@@ -201,7 +249,9 @@ erDiagram
 | Identity | `users`, `candidate_profiles`, `staff_profiles` | Accounts, role-specific details, preferences, accessibility needs, language |
 | Ticketing core | `requests`, `request_messages`, `attachments`, `request_ratings`, `categories`, `priority_sla`, `reference_counters` | Requests, conversations, files, satisfaction ratings, SLA and reference numbers |
 | Workflow engine | `request_statuses`, `status_transitions`, `transition_overrides`, `audit_log` | The state machine whitelist, admin override tokens, and the immutable history |
-| Candidate journey | `milestones`, `milestone_requirements`, `candidate_requirement_progress` | The five-milestone roadmap and verified requirements |
+| Candidate journey | `milestones`, `milestone_requirements`, `candidate_requirement_progress` | One roadmap node per stage, and its exit criteria (supporting evidence) |
+| Official stages | `programme_stages`, `candidate_stages`, `stage_decisions`, `facilitator_streams` | The 5 official stages, each candidate's current stage (no row = Enrolled), the append-only stage audit trail, and which streams each facilitator approves |
+| Portfolio & recruiting | `candidate_portfolios`, `portfolio_items`, `portfolio_files`, `recruiter_shortlist` | Published profile, project links, uploaded CV/project/certificate files, each recruiter's private shortlist |
 | Engagement | `xp_events`, `user_badges`, `feed_posts`, `feed_reactions` | XP, badges, the cohort feed and reactions |
 
 ## Integrity rules enforced by the database
@@ -223,6 +273,22 @@ erDiagram
 | `trg_requests_consume_override` | The override token is deleted after use, so it works only once. |
 | `trg_audit_no_update`, `trg_audit_no_delete` | The audit log is append-only. |
 
+**Triggers (official stages)**
+
+| Trigger | Rule |
+|---|---|
+| `trg_stage_decision_guard` (BEFORE INSERT on `stage_decisions`) | `STAGE_UNCHANGED`: can't decide the stage the candidate is already at. |
+| | `STAGE_STALE`: the decision must start from the candidate's current stage. |
+| | `STAGE_SKIP`: forward decisions move exactly one stage. |
+| | `STAGE_BACKWARD_ADMIN_ONLY`: only an active admin can move a candidate back. |
+| | `STAGE_NOT_AUTHORISED`: forward decisions need an active admin or a facilitator assigned to the candidate's stream. |
+| `trg_candidate_stage_insert`, `trg_candidate_stage_guard` | `STAGE_AUDIT_REQUIRED`: the official stage can only change to what the **latest stage decision** says, so there is no stage change without a who/when/why record. |
+| `trg_stage_decisions_no_update`, `trg_stage_decisions_no_delete` | The stage audit trail is append-only. |
+
+The reason is required by a `CHECK` (3–1000 characters); the API additionally requires 10+ characters for backward moves.
+
+**Migration of older databases.** On start-up, a database with the old five milestones (screening, onboarding, training, work_ready, placed) is re-keyed in place: screening + onboarding become *Enrolled*, partner matching and the agreement move to *Work Ready*'s exit criteria, and *Completed* is added. Verified progress is kept. Each existing candidate then gets an official stage from their evidence, recorded as a system `initial` decision ("Imported from verified requirement progress") so the trail explains it. The `users` table is rebuilt once to allow the `facilitator` role.
+
 **Idempotency**
 - `UNIQUE (user_id, kind, ref)` on `xp_events` means XP can never be awarded twice for the same thing.
 - `UNIQUE ref` on `feed_posts` means birthday and badge posts are created only once.
@@ -235,6 +301,6 @@ The schema itself inserts:
 - the 7 statuses and 11 allowed transitions;
 - SLA hours per priority: Urgent 4, High 24, Medium 72, Low 120;
 - 11 categories, 5 of them blockers;
-- 5 milestones with 18 requirements.
+- 5 official stages, and 5 roadmap milestones with 20 exit criteria (Enrolled 8, In Training 4, Work Ready 5, Placed 3, Completed none).
 
-`npm run db:reset` then loads demo users, requests, progress, ratings and feed posts. It drives every request through the real workflow code, so the audit trail is genuine.
+`npm run db:reset` then loads demo users (including a facilitator for three streams and a recruiter), requests, evidence, stage decisions (inserted through the same triggers), ratings and feed posts. It drives every request through the real workflow code, so the audit trail is genuine.

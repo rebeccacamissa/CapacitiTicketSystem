@@ -63,11 +63,12 @@ const DEMO_INFO = {
   support: ['users', 'Ticket queue, workload, update candidates'],
   admin: ['shield', 'Add/remove users, roles, categories, analytics'],
   recruiter: ['users', 'Explore shared talent profiles and portfolios'],
+  facilitator: ['flag', 'Review evidence and approve stage decisions'],
 };
 api('/auth/demo-accounts').then(({ enabled, accounts }) => {
   if (!enabled || !accounts.length) return;
   document.getElementById('demo').classList.remove('hidden');
-  const order = ['candidate', 'support', 'admin', 'recruiter'];
+  const order = ['candidate', 'support', 'admin', 'facilitator', 'recruiter'];
   document.getElementById('demo-buttons').innerHTML = accounts.sort((a, b) => order.indexOf(a.role) - order.indexOf(b.role)).map((a) => `
     <button type="button" data-role="${a.role}" class="glow-ring flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-left transition hover:-translate-y-0.5 hover:bg-white/10">
       <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple/50 to-salmon/40">${icon(DEMO_INFO[a.role][0])}</span>

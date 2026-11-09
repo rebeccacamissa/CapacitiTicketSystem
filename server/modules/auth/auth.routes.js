@@ -77,6 +77,7 @@ const DEMO_EMAILS = {
   support: 'thabo@capaciti.org.za',
   admin: 'admin@capaciti.org.za',
   recruiter: 'recruiter@capaciti.org.za',
+  facilitator: 'facilitator@capaciti.org.za',
 };
 
 router.get('/demo-accounts', (req, res) => {

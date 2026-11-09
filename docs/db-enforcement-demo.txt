@@ -1,5 +1,5 @@
 Command: npm run demo:illegal
-Generated: 2026-11-08T20:48:19.184Z · Node v24.12.0 · win32
+Generated: 2026-11-09T21:06:58.372Z · Node v24.12.0 · win32
 
 
 Request REQ-2026-0001 is "Open". Raw SQL, no application code:
