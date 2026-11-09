@@ -38,13 +38,21 @@ const STEPS = {
     { el: 'categories', title: 'Categories', body: 'Configure request categories. "Blocker" categories show as support intervention on candidate roadmaps.' },
     ...COMMON_END,
   ],
+  recruiter: [
+    ...COMMON_START,
+    { el: 'talent-hero', title: 'Talent discovery', body: 'Start here to explore candidates who have chosen to share their profiles and portfolios with recruiters.' },
+    { el: 'recruiter-kpis', title: 'Your talent pool', body: 'See how many profiles are visible, who is work ready or placed, and how many streams are active.' },
+    ...COMMON_END,
+  ],
 };
-const HOME = { candidate: '/dashboard', support: '/insights', admin: '/admin' };
+const HOME = { candidate: '/dashboard', support: '/insights', admin: '/admin', recruiter: '/recruiter' };
 
 let running = false;
 
 export function startTour(user, { avatar } = {}) {
   if (running) return;
+  // A role without a home page or walkthrough steps simply skips the tour (never navigate to "undefined").
+  if (!HOME[user.role] || !STEPS[user.role]) return;
   if (location.pathname !== HOME[user.role]) { location.href = `${HOME[user.role]}?tour=1`; return; }
   running = true;
   const steps = STEPS[user.role];
