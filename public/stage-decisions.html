@@ -12,6 +12,27 @@
 </head>
 <body>
   <main id="main" class="opacity-0 space-y-6" data-title="Stage decisions" data-subtitle="Official programme stages" data-easy="Choose a candidate, check their evidence, choose the next stage and write why. Stages move one step at a time. Every decision is saved in the audit trail below.">
+    <section class="card" aria-labelledby="inbox-title">
+      <div class="flex flex-wrap items-end justify-between gap-3">
+        <div><h2 id="inbox-title" class="text-lg">Approval inbox</h2>
+          <p class="text-sm text-white/55">Candidates with every exit criterion evidenced, or who asked for a review. Approve several at once with one shared note.</p></div>
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="inbox-all" class="h-4 w-4 accent-salmon">Select all</label>
+      </div>
+      <ul id="inbox" class="mt-4 grid gap-2 md:grid-cols-2" aria-live="polite"></ul>
+      <form id="inbox-form" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end" novalidate>
+        <div class="flex-1"><label for="inbox-note" class="field-label">Shared approval note</label>
+          <input id="inbox-note" name="reason" maxlength="1000" class="field" placeholder="e.g. Cohort onboarding checklist verified with each candidate.">
+          <p class="field-error" data-error-for="reason"></p></div>
+        <button class="btn btn-primary btn-shine" id="inbox-approve" disabled>Approve selected</button>
+      </form>
+    </section>
+
+    <section id="placements" class="card scroll-mt-28" aria-labelledby="pl-title">
+      <h2 id="pl-title" class="text-lg">Placements to confirm</h2>
+      <p class="text-sm text-white/55">A recruiter reported a hire. Confirming records an official stage decision to Placed (the candidate must be Work Ready).</p>
+      <ul id="pl-list" class="mt-4 space-y-2" aria-live="polite"></ul>
+    </section>
+
     <div class="grid gap-6 xl:grid-cols-5">
       <section class="card xl:col-span-2" aria-labelledby="approve-title">
         <h2 id="approve-title" class="text-lg">Stage approval</h2>
@@ -30,10 +51,12 @@
       <section class="card xl:col-span-3" aria-labelledby="trail-title">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div><h2 id="trail-title" class="text-lg">Stage audit trail</h2><p id="trail-scope" class="text-sm text-white/55"></p></div>
-          <div class="flex gap-2">
+          <div class="flex flex-wrap gap-2">
             <label class="sr-only" for="trail-search">Search the audit trail</label>
             <input id="trail-search" type="search" class="field !w-48 !py-1.5 text-sm" placeholder="Search name or reason">
             <button type="button" id="trail-all" class="btn btn-ghost btn-sm hidden">Show all</button>
+            <a id="trail-csv" href="/api/stages/decisions/export.csv" class="btn btn-ghost btn-sm" download>CSV</a>
+            <a id="trail-pdf" href="/api/stages/decisions/export.pdf" class="btn btn-ghost btn-sm" download>PDF</a>
           </div>
         </div>
         <ul id="trail" class="stagger mt-4 space-y-2"></ul>

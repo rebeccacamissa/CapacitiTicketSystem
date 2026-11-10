@@ -1,5 +1,5 @@
 // Live updates over Server-Sent Events. Pages subscribe with onLive('request', fn).
-const TYPES = ['request', 'notify', 'progress', 'feed', 'xp', 'people'];
+const TYPES = ['request', 'notify', 'progress', 'feed', 'xp', 'people', 'interview'];
 let source = null;
 
 export function startLive() {

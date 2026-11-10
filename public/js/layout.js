@@ -25,6 +25,7 @@ const NAV = {
     ['Dashboard', [['/dashboard', 'My dashboard', 'home']]],
     ['Support', [['/requests', 'My requests', 'ticket'], ['/new-request', 'New request', 'plus']]],
     ['Community', [['/feed', 'Cohort feed', 'megaphone']]],
+    ['Career', [['/career', 'CV builder & interview practice', 'rocket']]],
     ['Me', [['/profile', 'Profile & avatar', 'user']]],
   ],
   support: [
@@ -36,15 +37,18 @@ const NAV = {
   admin: [
     ['Dashboards', [['/admin', 'Control centre', 'shield'], ['/insights', 'Support analytics', 'chart']]],
     ['Work', [['/requests', 'All requests', 'ticket'], ['/candidates', 'Candidates', 'users'], ['/stage-decisions', 'Stage decisions', 'flag']]],
+    ['Insight', [['/reports', 'Programme reports', 'chart'], ['/interviews', 'Interview requests', 'calendar']]],
     ['Community', [['/feed', 'Cohort feed', 'megaphone']]],
     ['Me', [['/profile', 'Profile & avatar', 'user']]],
   ],
   recruiter: [
-    ['Recruiter workspace', [['/recruiter', 'Overview', 'home'], ['/talent-board', 'Talent board', 'search'], ['/candidate-profiles', 'Candidate profiles', 'users'], ['/portfolios', 'Portfolios', 'folder'], ['/shortlist', 'My shortlist', 'star']]],
+    ['Recruiter workspace', [['/recruiter', 'Overview', 'home'], ['/talent-board', 'Talent board', 'search'], ['/candidate-profiles', 'Candidate profiles', 'users'], ['/portfolios', 'Portfolios', 'folder'], ['/shortlist', 'My shortlist', 'star'], ['/interviews', 'Interviews', 'calendar']]],
+    ['Me', [['/profile', 'Profile & privacy', 'user']]],
   ],
   facilitator: [
     ['Dashboard', [['/facilitator', 'My streams', 'home']]],
     ['Reviews', [['/stage-decisions', 'Stage approvals', 'flag'], ['/candidates', 'Candidate evidence', 'users']]],
+    ['Insight', [['/reports', 'Stream reports', 'chart'], ['/interviews', 'Interview requests', 'calendar']]],
     ['Community', [['/feed', 'Cohort feed', 'megaphone']]],
     ['Me', [['/profile', 'Profile & avatar', 'user']]],
   ],
@@ -107,7 +111,36 @@ export async function initPage({ roles } = {}) {
   document.documentElement.dataset.role = user.role;
   applyPreferences(user.preferences);
   buildShell(user, demoMode);
+  if (!user.privacyAcknowledged) showPrivacyNotice();
   return user;
+}
+
+/** One-time POPIA privacy notice (Protection of Personal Information Act). */
+function showPrivacyNotice() {
+  const wrap = document.createElement('div');
+  wrap.className = 'fixed inset-0 z-[95] flex items-end justify-center bg-ink/70 p-3 backdrop-blur-sm sm:items-center';
+  wrap.innerHTML = `
+    <section role="dialog" aria-modal="true" aria-labelledby="privacy-title" class="glass-strong max-h-[90vh] w-full max-w-lg overflow-y-auto p-6 text-white">
+      <p class="chip">${icon('shield', 'h-3.5 w-3.5')}${t('Your privacy')}</p>
+      <h2 id="privacy-title" class="mt-3 text-xl">${t('How we use your information')}</h2>
+      <div class="mt-3 space-y-2 text-sm text-white/75">
+        <p>${t('CAPACITI uses the information in this portal to support you through the programme: your profile, requests, programme progress and the documents you upload.')}</p>
+        <p>${t('Programme staff see what they need for their role. Recruiters only see your portfolio if you choose to share it, and you can stop sharing at any time.')}</p>
+        <p>${t('AI features (CV tailoring and interview practice) are optional and only send your information to the AI service when you agree each time.')}</p>
+        <p>${t('Under POPIA you can download all your data, ask us to correct it, or ask for your account to be deleted, from your Profile page.')}</p>
+      </div>
+      <div class="mt-5 flex flex-wrap justify-end gap-2">
+        <a href="/profile#privacy" class="btn btn-ghost">${t('Privacy options')}</a>
+        <button type="button" data-ack class="btn btn-primary">${t('I understand')}</button>
+      </div>
+    </section>`;
+  document.body.append(wrap);
+  const btn = wrap.querySelector('[data-ack]');
+  btn.focus();
+  btn.addEventListener('click', async () => {
+    try { await api('/privacy/acknowledge', { method: 'POST' }); } catch { /* shown again next time */ }
+    wrap.remove();
+  });
 }
 
 function buildShell(user, demoMode) {
@@ -184,7 +217,7 @@ function buildShell(user, demoMode) {
           </div>
           <a href="/profile" class="hidden sm:block" aria-label="${t('Your profile')}" data-top-avatar>${avatarHtml({ name: user.fullName, avatar: user.avatar, id: user.id }, 'h-10 w-10 text-sm', 'transition hover:scale-105')}</a>
         </div>
-        ${demoMode ? `<div class="mt-2 flex items-center justify-center gap-1 xl:hidden" role="group" aria-label="Demo: preview as role">${demoBtns('rounded-lg px-3 py-1 text-xs font-semibold border border-white/10 bg-white/5')}</div>` : ''}
+        ${demoMode ? `<div class="mt-2 flex flex-wrap items-center justify-center gap-1 xl:hidden" role="group" aria-label="Demo: preview as role">${demoBtns('rounded-lg px-3 py-1 text-xs font-semibold border border-white/10 bg-white/5')}</div>` : ''}
         <div id="banner-slot"></div>
       </header>
       <div id="main-wrap" class="px-4 pt-6 pb-28 sm:px-6"></div>

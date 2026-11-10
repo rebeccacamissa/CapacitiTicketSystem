@@ -29,6 +29,12 @@
       <div id="kpis" class="stagger relative mt-6 grid grid-cols-2 gap-3 md:grid-cols-4"></div>
     </section>
 
+    <section id="privacy" class="card scroll-mt-28" aria-labelledby="privacy-title">
+      <h2 id="privacy-title" class="text-lg">Privacy requests (POPIA)</h2>
+      <p class="text-sm text-white/55">Account deletion requests. Completing one anonymises the account: records the audit trail needs are kept, but no longer identify the person. Declining needs a reason, which the user receives.</p>
+      <ul id="privacy-list" class="mt-4 space-y-2" aria-live="polite"></ul>
+    </section>
+
     <section class="card" data-tour="pipeline" aria-labelledby="pipe-title">
       <div class="flex flex-wrap items-end justify-between gap-3">
         <div><h2 id="pipe-title" class="text-lg">Programme pipeline</h2><p id="pipe-note" class="text-sm text-white/55">Official stages across every stream.</p></div>
@@ -46,7 +52,7 @@
       <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 id="users-title" class="text-lg">Users &amp; roles</h2>
         <div class="flex flex-wrap items-center gap-2">
-          <div class="flex rounded-xl border border-white/10 bg-white/5 p-1" role="group" aria-label="Filter by role" id="role-filter"></div>
+          <div class="flex flex-wrap rounded-xl border border-white/10 bg-white/5 p-1" role="group" aria-label="Filter by role" id="role-filter"></div>
           <label for="user-search" class="sr-only">Search users</label>
           <input id="user-search" type="search" class="field !w-56 !py-2" placeholder="Search users">
         </div>

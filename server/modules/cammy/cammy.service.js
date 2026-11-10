@@ -60,7 +60,7 @@ const SUGGEST = {
   facilitator: ['Show me around', 'Who is ready for review?', 'How do stage decisions work?', 'Accessibility options'],
 };
 
-function reply(db, user, rawMessage) {
+async function reply(db, user, rawMessage) {
   const lang = user.language || 'en';
   const T = (s, v) => tr(lang, s, v);
   const text = norm(rawMessage || '');
@@ -97,7 +97,7 @@ function reply(db, user, rawMessage) {
   }
 
   if (has(text, KW.badges)) {
-    const g = gamify.summary(db, user.id, user.role);
+    const g = await gamify.summary(db, user.id, user.role);
     const earned = g.badges.filter((b) => b.earned);
     const next = g.badges.find((b) => !b.earned);
     let msg = T("You're **Level {level}** with **{xp} XP** ({toNext} XP to the next level). You've earned {earned} of {total} badges.", { level: g.level, xp: g.xp, toNext: g.levelSize - g.levelProgress, earned: earned.length, total: g.badges.length });
@@ -132,7 +132,7 @@ function reply(db, user, rawMessage) {
 
   if (user.role === 'facilitator') {
     if (has(text, ['ready', 'review', 'waiting', 'approve'])) {
-      const ready = require('../stages/stage.service').candidates(db, user).filter((c) => c.readyForReview);
+      const ready = (await require('../stages/stage.service').candidates(db, user)).filter((c) => c.readyForReview || c.reviewRequested);
       if (!ready.length) return out(T('Nobody in your streams is ready for a stage review yet.'), [act('Open stage approvals', '/stage-decisions')]);
       const lines = ready.map((c) => `• **${c.fullName}**: ${T(c.stageLabel)} → ${T(c.nextStage.label)}`);
       return out(`${T('Ready for a stage review: {n}', { n: ready.length })}\n${lines.join('\n')}`, [act('Open stage approvals', '/stage-decisions')]);
@@ -158,7 +158,7 @@ function reply(db, user, rawMessage) {
 
   if (user.role === 'candidate') {
     if (has(text, KW.requests)) {
-      const rows = db.prepare("SELECT id, reference, title, status FROM requests WHERE candidate_id = ? AND status NOT IN ('Closed') ORDER BY updated_at DESC LIMIT 5").all(user.id);
+      const rows = (await db.all("SELECT id, reference, title, status FROM requests WHERE candidate_id = ? AND status NOT IN ('Closed') ORDER BY updated_at DESC LIMIT 5", user.id));
       if (!rows.length) return out(T("You don't have any open requests right now. Need help with something?"), [act('Create a request', '/new-request')]);
       const waiting = rows.filter((r) => r.status === 'Waiting for Candidate').length;
       let msg = `${T('You have {n} active requests:', { n: rows.length })}\n${rows.map((r) => `• **${r.reference}**: ${T(r.status)}`).join('\n')}`;
@@ -166,7 +166,7 @@ function reply(db, user, rawMessage) {
       return out(msg, rows.slice(0, 3).map((r) => ({ label: r.reference, href: `/request?id=${r.id}` })));
     }
     if (has(text, KW.journey)) {
-      const rm = getRoadmap(db, user.id);
+      const rm = await getRoadmap(db, user.id);
       if (rm.allComplete) return out(T('You have completed the CAPACITI programme. Congratulations!'), [], { mood: 'celebrate' });
       const m = rm.milestones[rm.activeIndex];
       const left = m.requirements.filter((r) => !r.completed).map((r) => `• ${T(r.label)}`);
@@ -177,7 +177,7 @@ function reply(db, user, rawMessage) {
       return out(msg, [act('View my roadmap', '/dashboard#roadmap')]);
     }
     if (has(text, KW.team)) {
-      const p = getProfile(db, user.id).candidate || {};
+      const p = (await getProfile(db, user.id)).candidate || {};
       const line = (label, v, empty) => `• ${T(label)}: **${v || T(empty)}**`;
       return out(`${T("Here's your programme team:")}\n${[
         line('Cohort', p.cohort, 'not set'), line('Stream', p.stream, 'not set'), line('Mentor', p.mentor, 'not assigned yet'),
@@ -187,8 +187,8 @@ function reply(db, user, rawMessage) {
   }
 
   if (has(text, KW.birthday)) {
-    const p = getProfile(db, user.id);
-    const b = birthdays(db);
+    const p = await getProfile(db, user.id);
+    const b = await birthdays(db);
     const others = b.today.filter((x) => x.id !== user.id);
     let msg = p.birthday
       ? (p.birthday.isToday ? T("It's YOUR birthday today, {name}! Happy birthday from all of us!", { name: first }) : T('Your birthday is in **{n} days**.', { n: p.birthday.daysUntil }))
@@ -200,11 +200,11 @@ function reply(db, user, rawMessage) {
 
   if (user.role !== 'candidate') {
     if (has(text, KW.queue)) {
-      const q = db.prepare(`SELECT
-          SUM(assigned_to IS NULL AND status IN ('Open','Reopened')) AS unassigned,
-          SUM(assigned_to = ? AND status NOT IN ('Resolved','Closed')) AS mine,
-          SUM(status NOT IN ('Resolved','Closed') AND due_at < strftime('%Y-%m-%dT%H:%M:%fZ','now')) AS overdue
-        FROM requests`).get(user.id);
+      const q = (await db.one(`SELECT
+          COUNT(*) FILTER (WHERE assigned_to IS NULL AND status IN ('Open','Reopened')) AS unassigned,
+          COUNT(*) FILTER (WHERE assigned_to = ? AND status NOT IN ('Resolved','Closed')) AS mine,
+          COUNT(*) FILTER (WHERE status NOT IN ('Resolved','Closed') AND due_at < now_iso()) AS overdue
+        FROM requests`, user.id));
       return out(T('Queue snapshot:\n• **{u}** unassigned\n• **{m}** assigned to you\n• **{o}** overdue across the team', { u: q.unassigned || 0, m: q.mine || 0, o: q.overdue || 0 }),
         [act('Unassigned', '/requests?assigned=unassigned'), act('My cases', '/requests?assigned=me'), act('Overdue', '/requests?overdue=true')]);
     }

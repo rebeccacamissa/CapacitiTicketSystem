@@ -71,6 +71,30 @@ router.post(
   }
 );
 
+// ---- Password reset by email ------------------------------------------------------
+const resetLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5 });
+
+/** Always 202 with the same message, whether or not the account exists (no user enumeration). */
+router.post(
+  '/forgot-password',
+  resetLimiter,
+  validate({ email: { type: 'string', required: true, max: 254, pattern: EMAIL_RE, patternMessage: 'Enter a valid email address', label: 'Email' } }),
+  async (req, res) => {
+    await service.forgotPassword(req.body.email);
+    res.status(202).json({ ok: true, message: 'If an account exists for that email, we have sent a reset link. It expires in 30 minutes.' });
+  }
+);
+
+router.post(
+  '/reset-password',
+  resetLimiter,
+  validate({ token: { type: 'string', required: true, min: 20, max: 200, trim: false }, newPassword: { ...PASSWORD, label: 'New password' } }),
+  async (req, res) => {
+    await service.resetPassword(req.body);
+    res.json({ ok: true });
+  }
+);
+
 // ---- Demo role switcher (DEMO_MODE=true, never in production) -------------------
 const DEMO_EMAILS = {
   candidate: 'lerato@example.com',
@@ -80,16 +104,15 @@ const DEMO_EMAILS = {
   facilitator: 'facilitator@capaciti.org.za',
 };
 
-router.get('/demo-accounts', (req, res) => {
+router.get('/demo-accounts', async (req, res) => {
   if (!demoMode) return res.json({ enabled: false, accounts: [] });
-  const rows = getDb().prepare(`SELECT id, full_name, role, email FROM users WHERE email IN (${Object.values(DEMO_EMAILS).map(() => '?').join(',')}) AND is_active = 1`)
-    .all(...Object.values(DEMO_EMAILS));
+  const rows = await getDb().all(`SELECT id, full_name, role, email FROM users WHERE email IN (${Object.values(DEMO_EMAILS).map(() => '?').join(',')}) AND is_active = 1`, Object.values(DEMO_EMAILS));
   res.json({ enabled: true, accounts: rows.map((r) => ({ role: r.role, name: r.full_name })) });
 });
 
-router.post('/demo-login', validate({ role: { type: 'enum', required: true, values: Object.keys(DEMO_EMAILS) } }), (req, res) => {
+router.post('/demo-login', validate({ role: { type: 'enum', required: true, values: Object.keys(DEMO_EMAILS) } }), async (req, res) => {
   if (!demoMode) throw notFound();
-  const u = getDb().prepare('SELECT * FROM users WHERE email = ? AND is_active = 1').get(DEMO_EMAILS[req.body.role]);
+  const u = await getDb().one('SELECT * FROM users WHERE email = ? AND is_active = 1', DEMO_EMAILS[req.body.role]);
   if (!u) throw notFound('Demo account not found — run npm run db:reset');
   const user = service.publicUser(u);
   setAuthCookie(res, signToken(user));

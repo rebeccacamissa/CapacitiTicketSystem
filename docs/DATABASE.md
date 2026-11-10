@@ -1,6 +1,6 @@
 # Database design
 
-- **Engine:** SQLite 3.50, using Node's built-in `node:sqlite`, with WAL journal mode and foreign keys enforced.
+- **Engine:** PostgreSQL. In production a hosted database such as Neon (`DATABASE_URL`); for local development and tests an embedded Postgres engine (PGlite), so there is one SQL dialect everywhere. Timestamps are ISO-8601 UTC text, produced by the `now_iso()` helper.
 - **Schema:** [`server/db/schema.sql`](../server/db/schema.sql). It is applied automatically and idempotently on start-up.
 
 ## Entity-relationship diagram
@@ -34,6 +34,16 @@ erDiagram
     users ||--o{ portfolio_items : "project links"
     users ||--o{ portfolio_files : "CV / project / certificate"
     users ||--o{ recruiter_shortlist : "shortlists (recruiter / candidate)"
+    users ||--o{ interview_requests : "invites / is invited"
+    users ||--o{ placements : "reported hire"
+    users ||--o{ review_requests : "asks for review"
+    users ||--o| cv_profiles : "CV builder"
+    users ||--o{ mock_interviews : practises
+    users ||--o{ password_reset_tokens : "reset links"
+    users ||--o{ deletion_requests : "POPIA request"
+    portfolio_files ||--|| file_blobs : "content"
+    attachments ||--|| file_blobs : "content"
+    portfolio_files ||--o{ candidate_requirement_progress : "evidence for"
     users ||--o{ xp_events : earns
     users ||--o{ user_badges : holds
     users ||--o{ feed_posts : "author / subject"
@@ -251,7 +261,11 @@ erDiagram
 | Workflow engine | `request_statuses`, `status_transitions`, `transition_overrides`, `audit_log` | The state machine whitelist, admin override tokens, and the immutable history |
 | Candidate journey | `milestones`, `milestone_requirements`, `candidate_requirement_progress` | One roadmap node per stage, and its exit criteria (supporting evidence) |
 | Official stages | `programme_stages`, `candidate_stages`, `stage_decisions`, `facilitator_streams` | The 5 official stages, each candidate's current stage (no row = Enrolled), the append-only stage audit trail, and which streams each facilitator approves |
-| Portfolio & recruiting | `candidate_portfolios`, `portfolio_items`, `portfolio_files`, `recruiter_shortlist` | Published profile, project links, uploaded CV/project/certificate files, each recruiter's private shortlist |
+| Portfolio & recruiting | `candidate_portfolios`, `portfolio_items`, `portfolio_files`, `recruiter_shortlist`, `interview_requests`, `placements` | Published profile, project links, uploaded CV/project/certificate files, each recruiter's private shortlist, interview invitations, reported hires awaiting confirmation |
+| Workflow helpers | `review_requests` | Candidate-requested stage reviews (one open per candidate) |
+| Career tools | `cv_profiles`, `mock_interviews` | CV builder data; practice interviews with answers and feedback |
+| Files | `file_blobs` | Contents of every uploaded or generated file (`BYTEA`), keyed by a random stored name, so files survive redeploys |
+| Accounts & privacy | `password_reset_tokens`, `deletion_requests`, `email_log` | Hashed single-use reset tokens, POPIA deletion requests, outgoing email log (recipient, subject, status; never the body) |
 | Engagement | `xp_events`, `user_badges`, `feed_posts`, `feed_reactions` | XP, badges, the cohort feed and reactions |
 
 ## Integrity rules enforced by the database
@@ -260,7 +274,7 @@ erDiagram
 - `CHECK` constraints on roles, priorities, flags and lengths, the reference format (`REQ-YYYY-N…`), date of birth, `json_valid()` on JSON columns, ratings from 1 to 5, and attachment size of 5 MB or less.
 - Foreign keys everywhere. A user's profile rows are removed when the user is (`ON DELETE CASCADE`).
 
-**Triggers (the state machine)**
+**Triggers (the state machine)**: PL/pgSQL functions that raise `CODE: message` exceptions, which the API maps to `DB_*` error codes.
 
 | Trigger | Rule |
 |---|---|

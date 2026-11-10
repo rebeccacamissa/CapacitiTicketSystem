@@ -6,37 +6,37 @@ const { badRequest, notFound } = require('../../utils/AppError');
 
 const REACTIONS = ['cheer', 'love', 'fire', 'star'];
 
-function cohortOf(db, userId) {
-  return db.prepare('SELECT cohort FROM candidate_profiles WHERE user_id = ?').get(userId)?.cohort || null;
+async function cohortOf(db, userId) {
+  return (await db.one('SELECT cohort FROM candidate_profiles WHERE user_id = ?', userId))?.cohort || null;
 }
 
 /** Lazily create today's birthday posts (idempotent via unique ref). */
-function ensureBirthdayPosts(db) {
+async function ensureBirthdayPosts(db) {
   const today = new Date();
   const md = `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const ymd = today.toISOString().slice(0, 10);
-  const rows = db.prepare(`
+  const rows = await db.all(`
     SELECT u.id, u.full_name, cp.cohort FROM users u LEFT JOIN candidate_profiles cp ON cp.user_id = u.id
     WHERE u.is_active = 1 AND u.role = 'candidate' AND substr(u.date_of_birth, 6, 5) = ?
-  `).all(md);
+  `, md);
   let created = 0;
   for (const r of rows) {
-    created += db.prepare('INSERT OR IGNORE INTO feed_posts (kind, subject_id, cohort, body, ref) VALUES (?, ?, ?, ?, ?)')
-      .run('birthday', r.id, r.cohort || null, `It's ${r.full_name}'s birthday today. Send some love!`, `birthday:${r.id}:${ymd}`).changes;
+    created += (await db.run('INSERT INTO feed_posts (kind, subject_id, cohort, body, ref) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING',
+      'birthday', r.id, r.cohort || null, `It's ${r.full_name}'s birthday today. Send some love!`, `birthday:${r.id}:${ymd}`)).changes;
   }
   if (created) bus.publish('all', 'feed', {});
 }
 
-function list(db, user, { limit = 20, before } = {}) {
-  ensureBirthdayPosts(db);
+async function list(db, user, { limit = 20, before } = {}) {
+  await ensureBirthdayPosts(db);
   const where = [];
   const params = [];
   if (user.role === 'candidate') {
     where.push('(p.cohort IS NULL OR p.cohort = ?)');
-    params.push(cohortOf(db, user.id));
+    params.push(await cohortOf(db, user.id));
   }
   if (before) { where.push('p.id < ?'); params.push(before); }
-  const posts = db.prepare(`
+  const posts = await db.all(`
     SELECT p.id, p.kind, p.cohort, p.body, p.created_at,
            a.id AS author_id, a.full_name AS author_name, a.role AS author_role, a.avatar_config AS a_cfg, a.gender AS a_gender,
            s.id AS subject_id, s.full_name AS subject_name, s.avatar_config AS s_cfg, s.gender AS s_gender
@@ -45,10 +45,13 @@ function list(db, user, { limit = 20, before } = {}) {
     LEFT JOIN users s ON s.id = p.subject_id
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
     ORDER BY p.id DESC LIMIT ?
-  `).all(...params, limit);
+  `, [...params, limit]);
 
   const ids = posts.map((p) => p.id);
-  const reacts = ids.length ? db.prepare(`SELECT post_id, reaction, COUNT(*) n, SUM(user_id = ?) mine FROM feed_reactions WHERE post_id IN (${ids.map(() => '?').join(',')}) GROUP BY post_id, reaction`).all(user.id, ...ids) : [];
+  const reacts = ids.length
+    ? await db.all(`SELECT post_id, reaction, COUNT(*) n, SUM(CASE WHEN user_id = ? THEN 1 ELSE 0 END) mine FROM feed_reactions
+        WHERE post_id IN (${ids.map(() => '?').join(',')}) GROUP BY post_id, reaction`, [user.id, ...ids])
+    : [];
 
   return posts.map((p) => {
     const person = p.subject_id
@@ -66,25 +69,24 @@ function list(db, user, { limit = 20, before } = {}) {
   });
 }
 
-function post(db, user, { body, cohort }) {
-  const { lastInsertRowid } = db.prepare('INSERT INTO feed_posts (kind, author_id, cohort, body) VALUES (?, ?, ?, ?)')
-    .run('announcement', user.id, cohort || null, body);
-  bus.publish('all', 'feed', { id: Number(lastInsertRowid) });
-  return Number(lastInsertRowid);
+async function post(db, user, { body, cohort }) {
+  const id = await db.insert('INSERT INTO feed_posts (kind, author_id, cohort, body) VALUES (?, ?, ?, ?)', 'announcement', user.id, cohort || null, body);
+  bus.publish('all', 'feed', { id });
+  return id;
 }
 
-function react(db, user, postId, reaction) {
+async function react(db, user, postId, reaction) {
   if (!REACTIONS.includes(reaction)) throw badRequest('Unknown reaction');
-  const p = db.prepare('SELECT id, cohort FROM feed_posts WHERE id = ?').get(postId);
-  if (!p || (user.role === 'candidate' && p.cohort && p.cohort !== cohortOf(db, user.id))) throw notFound('Post not found');
-  const del = db.prepare('DELETE FROM feed_reactions WHERE post_id = ? AND user_id = ? AND reaction = ?').run(postId, user.id, reaction);
-  if (!del.changes) db.prepare('INSERT INTO feed_reactions (post_id, user_id, reaction) VALUES (?, ?, ?)').run(postId, user.id, reaction);
+  const p = await db.one('SELECT id, cohort FROM feed_posts WHERE id = ?', postId);
+  if (!p || (user.role === 'candidate' && p.cohort && p.cohort !== await cohortOf(db, user.id))) throw notFound('Post not found');
+  const del = await db.run('DELETE FROM feed_reactions WHERE post_id = ? AND user_id = ? AND reaction = ?', postId, user.id, reaction);
+  if (!del.changes) await db.run('INSERT INTO feed_reactions (post_id, user_id, reaction) VALUES (?, ?, ?) ON CONFLICT DO NOTHING', postId, user.id, reaction);
   bus.publish('all', 'feed', { id: postId, reaction: true });
   return { active: !del.changes };
 }
 
-function remove(db, postId) {
-  const r = db.prepare('DELETE FROM feed_posts WHERE id = ?').run(postId);
+async function remove(db, postId) {
+  const r = await db.run('DELETE FROM feed_posts WHERE id = ?', postId);
   if (!r.changes) throw notFound('Post not found');
   bus.publish('all', 'feed', {});
 }

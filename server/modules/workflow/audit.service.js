@@ -4,22 +4,22 @@
  * Owner: Member C
  */
 
-function writeAudit(db, { requestId, userId, action, oldStatus = null, newStatus = null, details = null, internalNotes = null, isOverride = false }) {
-  db.prepare(`
+async function writeAudit(db, { requestId, userId, action, oldStatus = null, newStatus = null, details = null, internalNotes = null, isOverride = false }) {
+  await db.run(`
     INSERT INTO audit_log (request_id, changed_by_user_id, action, old_status, new_status, details, internal_notes, is_override)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(requestId, userId, action, oldStatus, newStatus, details, internalNotes, isOverride ? 1 : 0);
+  `, requestId, userId, action, oldStatus, newStatus, details, internalNotes, isOverride ? 1 : 0);
 }
 
 /** Staff see everything; candidates see the timeline without internal notes or staff-only detail. */
-function getHistory(db, requestId, viewer) {
-  const rows = db.prepare(`
+async function getHistory(db, requestId, viewer) {
+  const rows = await db.all(`
     SELECT a.id, a.action, a.old_status, a.new_status, a.details, a.internal_notes, a.is_override, a.timestamp,
            u.full_name AS changed_by, u.role AS changed_by_role
     FROM audit_log a JOIN users u ON u.id = a.changed_by_user_id
     WHERE a.request_id = ?
     ORDER BY a.id ASC
-  `).all(requestId);
+  `, requestId);
 
   if (viewer.role !== 'candidate') return rows;
   return rows

@@ -1,18 +1,14 @@
 # Render Blueprint — one web service serves both the frontend and the API.
-# SQLite + uploads live on a persistent disk (requires a paid Render instance type;
-# on the free plan data resets on every deploy/restart).
+# Data lives in Postgres (e.g. Neon) via DATABASE_URL, so it survives every deploy and
+# restart, including on the free plan. Uploaded files are stored in the database too.
 services:
   - type: web
     name: capaciti-support
     runtime: node
-    plan: starter
+    plan: free
     buildCommand: npm ci --include=dev && npm run build:css && npm run i18n
     startCommand: npm run start:prod
     healthCheckPath: /api/health
-    disk:
-      name: capaciti-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
@@ -20,17 +16,22 @@ services:
         generateValue: true
       - key: JWT_EXPIRES_IN
         value: 8h
-      - key: DB_PATH
-        value: /var/data/capaciti.db
-      - key: UPLOAD_DIR
-        value: /var/data/uploads
       - key: BCRYPT_ROUNDS
         value: "12"
-      # Assessment/demo deployments only — turn off for real use.
+      # Neon (or any Postgres) connection string. Set it in the Render dashboard; never commit it.
+      # Without it the app falls back to an embedded database that resets on each deploy.
+      - key: DATABASE_URL
+        sync: false
+      # Demo shortcuts for an assessment deployment. Set DEMO_MODE to "false" for real users.
       - key: DEMO_MODE
         value: "true"
       - key: ALLOW_DEMO_IN_PRODUCTION
         value: "true"
-      # Optional: enables AI CV tailoring. Set the value in the Render dashboard (never commit it).
+      # Email via Resend (password resets and notifications). Optional: without it emails are logged.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      # Optional: enables AI CV tailoring and the AI mock interviewer.
       - key: ANTHROPIC_API_KEY
         sync: false

@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import { initPage } from '../layout.js';
-import { esc, toast, avatarHtml, fmtDate } from '../ui.js';
+import { esc, toast, avatarHtml, fmtDate, openModal, showFieldErrors, setBusy } from '../ui.js';
 import { icon } from '../icons.js';
 import { shortlistButton, wireShortlist } from '../components/shortlist.js';
 import { stageBadge } from '../components/stage-ui.js';
@@ -41,7 +41,7 @@ async function selectCandidate(id) {
         ${avatarHtml({ name: profile.fullName, avatar: profile.avatar, id: profile.id }, 'h-16 w-16 text-xl')}
         <div class="min-w-0 flex-1"><h2 class="text-2xl">${esc(profile.fullName)}</h2><p class="text-sm text-white/65">${esc(profile.email)}</p>
           <div class="mt-2 flex flex-wrap gap-2">${profile.stream ? `<span class="chip">${esc(profile.stream)}</span>` : ''}${profile.cohort ? `<span class="chip">${esc(profile.cohort)}</span>` : ''}${stageBadge(profile.stage, profile.stageLabel)}</div>
-        </div><div class="flex flex-wrap gap-2">${links}${shortlistButton(profile)}</div>
+        </div><div class="flex flex-wrap gap-2">${links}${shortlistButton(profile)}<button type="button" class="btn btn-primary btn-sm" data-interview>${icon('calendar', 'h-4 w-4')}Request interview</button><button type="button" class="btn btn-ghost btn-sm" data-hire>${icon('trophy', 'h-4 w-4')}Report a hire</button></div>
       </div>
       ${profile.headline ? `<h3 class="relative mt-5 text-lg font-semibold">${esc(profile.headline)}</h3>` : ''}
       ${profile.summary ? `<p class="relative mt-2 whitespace-pre-wrap text-sm leading-relaxed text-white/70">${esc(profile.summary)}</p>` : ''}
@@ -67,7 +67,12 @@ async function selectCandidate(id) {
           <span class="min-w-0 flex-1"><span class="block truncate text-sm font-medium">${esc(f.title)}</span><span class="block text-xs text-white/50">${esc({ cv: 'CV', project: 'Project', certificate: 'Certificate' }[f.kind])}${f.source === 'ai_tailored' ? ' · AI-tailored, reviewed by the candidate' : ''} · ${fmtDate(f.createdAt)}</span></span>
           ${icon('download', 'h-4 w-4 text-white/50')}</a></li>`).join('')}</ul>`
       : '<p class="mt-2 text-sm text-white/50">No documents have been shared yet.</p>'}
-    </section>`;
+    </section>
+    ${profile.interviews?.length ? `<section class="card"><h3 class="text-lg">My interview requests</h3>
+      <ul class="mt-3 space-y-2">${profile.interviews.map((i) => `<li class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm">
+        <span>${esc(i.roleTitle)} · ${esc(i.company)} <span class="text-xs text-white/50">· ${fmtDate(i.createdAt)}</span></span>
+        <span class="badge ${i.status === 'accepted' ? 'bg-ok/15 text-ok' : i.status === 'pending' ? 'bg-warn/15 text-warn' : 'bg-white/10 text-white/60'}">${esc(i.status)}</span></li>`).join('')}</ul>
+    </section>` : ''}`;
 }
 
 list.addEventListener('click', async (event) => {
@@ -78,6 +83,70 @@ list.addEventListener('click', async (event) => {
 });
 search.addEventListener('input', renderList);
 wireShortlist(detail, (id) => selectCandidate(id));
+function nameOf(id) { return candidates.find((c) => c.id === id)?.fullName || 'this candidate'; }
+
+function openInterviewForm(candidateId) {
+  const m = openModal(`
+    <form class="p-6" novalidate>
+      <h2 class="text-xl">Request an interview with ${esc(nameOf(candidateId))}</h2>
+      <p class="mt-1 text-sm text-white/60">The candidate is notified by email and on their dashboard, and can accept or decline. Programme staff can see interview requests.</p>
+      <div class="mt-5 grid gap-4 sm:grid-cols-2">
+        <div><label for="iv-company" class="field-label">Company</label><input id="iv-company" name="company" class="field" required maxlength="120"><p class="field-error" data-error-for="company"></p></div>
+        <div><label for="iv-role" class="field-label">Role</label><input id="iv-role" name="roleTitle" class="field" required maxlength="120"><p class="field-error" data-error-for="roleTitle"></p></div>
+        <div><label for="iv-when" class="field-label">Proposed date and time <span class="font-normal text-white/50">(optional)</span></label><input id="iv-when" name="proposedAt" type="datetime-local" class="field"><p class="field-error" data-error-for="proposedAt"></p></div>
+        <div><label for="iv-mode" class="field-label">Format</label><select id="iv-mode" name="mode" class="field"><option value="online">Online</option><option value="in-person">In person</option><option value="phone">Phone</option></select></div>
+        <div class="sm:col-span-2"><label for="iv-msg" class="field-label">Message <span class="font-normal text-white/50">(optional)</span></label><textarea id="iv-msg" name="message" rows="3" maxlength="1000" class="field"></textarea></div>
+      </div>
+      <div class="mt-6 flex justify-end gap-2"><button type="button" class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary">Send request</button></div>
+    </form>`, { wide: true });
+  const form = m.el.querySelector('form');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const body = { candidateId, company: form.company.value.trim(), roleTitle: form.roleTitle.value.trim(), proposedAt: form.proposedAt.value || undefined, mode: form.mode.value, message: form.message.value.trim() || undefined };
+    if (!showFieldErrors(form, { ...(body.company.length < 2 ? { company: 'Enter the company' } : {}), ...(body.roleTitle.length < 2 ? { roleTitle: 'Enter the role' } : {}) })) return;
+    const btn = form.querySelector('.btn-primary');
+    setBusy(btn, true, 'Sending…');
+    try {
+      await api('/recruiter/interviews', { method: 'POST', body });
+      m.close();
+      toast('Interview request sent', 'success');
+      selectCandidate(candidateId);
+    } catch (err) { setBusy(btn, false); showFieldErrors(form, err.details?.fields || {}); toast(err.message, 'error'); }
+  });
+}
+
+function openHireForm(candidateId) {
+  const m = openModal(`
+    <form class="p-6" novalidate>
+      <h2 class="text-xl">Report a hire: ${esc(nameOf(candidateId))}</h2>
+      <p class="mt-1 text-sm text-white/60">The candidate's facilitator confirms the placement. Confirming moves them to the official stage <strong>Placed</strong> (they must be Work Ready first).</p>
+      <div class="mt-5 grid gap-4 sm:grid-cols-2">
+        <div><label for="h-company" class="field-label">Partner company</label><input id="h-company" name="company" class="field" required maxlength="120"><p class="field-error" data-error-for="company"></p></div>
+        <div><label for="h-role" class="field-label">Role</label><input id="h-role" name="roleTitle" class="field" required maxlength="120"><p class="field-error" data-error-for="roleTitle"></p></div>
+        <div><label for="h-start" class="field-label">Start date <span class="font-normal text-white/50">(optional)</span></label><input id="h-start" name="startDate" type="date" class="field"></div>
+        <div class="sm:col-span-2"><label for="h-note" class="field-label">Note for the facilitator <span class="font-normal text-white/50">(optional)</span></label><textarea id="h-note" name="note" rows="2" maxlength="1000" class="field"></textarea></div>
+      </div>
+      <div class="mt-6 flex justify-end gap-2"><button type="button" class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary">Report hire</button></div>
+    </form>`, { wide: true });
+  const form = m.el.querySelector('form');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const body = { candidateId, company: form.company.value.trim(), roleTitle: form.roleTitle.value.trim(), startDate: form.startDate.value || undefined, note: form.note.value.trim() || undefined };
+    if (!showFieldErrors(form, { ...(body.company.length < 2 ? { company: 'Enter the company' } : {}), ...(body.roleTitle.length < 2 ? { roleTitle: 'Enter the role' } : {}) })) return;
+    const btn = form.querySelector('.btn-primary');
+    setBusy(btn, true, 'Sending…');
+    try {
+      await api('/recruiter/placements', { method: 'POST', body });
+      m.close();
+      toast('Hire reported. The facilitator will confirm it.', 'success');
+    } catch (err) { setBusy(btn, false); showFieldErrors(form, err.details?.fields || {}); toast(err.message, 'error'); }
+  });
+}
+
+detail.addEventListener('click', (e) => {
+  if (e.target.closest('[data-interview]')) openInterviewForm(selectedId);
+  if (e.target.closest('[data-hire]')) openHireForm(selectedId);
+});
 
 try {
   ({ candidates } = await api('/recruiter/talent'));

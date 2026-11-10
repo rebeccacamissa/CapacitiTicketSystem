@@ -8,7 +8,8 @@ RUN npm run build:css && npm run i18n && npm prune --omit=dev
 
 FROM node:24-alpine
 WORKDIR /app
-ENV NODE_ENV=production PORT=3000 DB_PATH=/data/capaciti.db UPLOAD_DIR=/data/uploads
+ENV NODE_ENV=production PORT=3000 PGLITE_DIR=/data/pglite
+# Set DATABASE_URL (e.g. Neon) at run time for persistent Postgres; otherwise the embedded database in /data is used.
 COPY --from=build /app /app
 RUN mkdir -p /data && chown -R node:node /data /app
 USER node

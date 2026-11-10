@@ -9,8 +9,8 @@ const { reply } = require('./cammy.service');
 const router = express.Router();
 router.use(authenticate);
 
-router.post('/chat', rateLimit({ windowMs: 60_000, max: 40 }), validate({ message: { type: 'string', max: 500 } }), (req, res) => {
-  res.json(reply(getDb(), req.user, req.body.message || ''));
+router.post('/chat', rateLimit({ windowMs: 60_000, max: 40 }), validate({ message: { type: 'string', max: 500 } }), async (req, res) => {
+  res.json(await reply(getDb(), req.user, req.body.message || ''));
 });
 
 module.exports = router;

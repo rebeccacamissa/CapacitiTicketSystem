@@ -20,18 +20,22 @@
     "i18n": "node scripts/build-i18n.js",
     "start:prod": "node --disable-warning=ExperimentalWarning server/db/seed.js && node --disable-warning=ExperimentalWarning server/server.js",
     "test:report": "node --disable-warning=ExperimentalWarning --test --test-reporter=spec tests/*.test.js",
-    "evidence": "node scripts/capture-evidence.js"
+    "evidence": "node scripts/capture-evidence.js",
+    "db:copy-sqlite": "node --disable-warning=ExperimentalWarning scripts/sqlite-to-postgres.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.7.0",
     "@dicebear/collection": "^9.4.2",
     "@dicebear/core": "^9.4.3",
+    "@electric-sql/pglite": "^0.5.16",
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.7",
     "express": "^5.1.0",
     "helmet": "^8.1.0",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "pdfkit": "^0.20.2",
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.0",

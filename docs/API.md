@@ -30,7 +30,7 @@ Every error looks like this:
 | 403 | `FORBIDDEN`, `ACCOUNT_DISABLED`, `PASSWORD_CHANGE_REQUIRED` |
 | 404 | `NOT_FOUND` |
 | 409 | **Workflow, application layer:** `ILLEGAL_STATUS_TRANSITION`, `NO_CHANGE`, `UNKNOWN_STATUS`, `REQUEST_FINALISED`, `REQUEST_CLOSED`, `NOT_RESOLVED` |
-|     | **Workflow, database layer** (raised by SQLite triggers): `DB_ILLEGAL_TRANSITION`, `DB_ASSIGNEE_REQUIRED`, `DB_RESOLUTION_REQUIRED`, `DB_AUDIT_REQUIRED`, `DB_INVALID_ASSIGNEE`, `DB_AUDIT_LOG_IMMUTABLE` |
+|     | **Workflow, database layer** (raised by PostgreSQL triggers): `DB_ILLEGAL_TRANSITION`, `DB_ASSIGNEE_REQUIRED`, `DB_RESOLUTION_REQUIRED`, `DB_AUDIT_REQUIRED`, `DB_INVALID_ASSIGNEE`, `DB_AUDIT_LOG_IMMUTABLE` |
 |     | **Data:** `EMAIL_TAKEN`, `EMPLOYEE_ID_TAKEN`, `DUPLICATE`, `HAS_ACTIVE_ASSIGNMENTS`, `USER_HAS_HISTORY` |
 | 429 | `RATE_LIMITED` |
 | 500 | `INTERNAL_ERROR` (no internal details are exposed in production) |
@@ -54,6 +54,8 @@ Every error looks like this:
 | POST | `/auth/change-password` | Signed in | `currentPassword`, `newPassword` | `{ ok: true }`. Clears the temporary-password flag. |
 | GET | `/auth/demo-accounts` | Public | – | `{ enabled, accounts[] }`. Only populated when `DEMO_MODE` is on. |
 | POST | `/auth/demo-login` | Public (demo only) | `role` | Signs in as the seeded demo user for that role. Returns 404 when demo mode is off. |
+| POST | `/auth/forgot-password` | Public (5 per 15 min) | `email` | Always `202` with the same message (no account enumeration). If the account exists, emails a single-use link valid for 30 minutes. Only a SHA-256 hash of the token is stored. |
+| POST | `/auth/reset-password` | Public (5 per 15 min) | `token`, `newPassword` | Sets the password and invalidates all of the user's open reset links. `400 RESET_TOKEN_INVALID` for unknown, used or expired tokens. |
 
 **Example**
 
@@ -107,6 +109,56 @@ Stages: `enrolled` → `training` → `work_ready` → `placed` → `completed`.
 | POST | `/stages/candidates/:id/decisions` | Admin, Facilitator (own streams) | `toStage`, `reason` | `201 { decision, fromStage, toStage, direction }`. Errors: `STAGE_SKIP`, `STAGE_UNCHANGED` (409), `STAGE_BACKWARD_ADMIN_ONLY` (403), 400 if the reason is missing (backward needs ≥ 10 characters), 404 outside the facilitator's streams |
 | GET | `/stages/decisions` | Admin (all), Facilitator (own streams), Candidate (own) | Optional `candidateId`, `limit` | `{ decisions }`: who, when, why, from → to, direction |
 
+### Added: batch approvals, review requests, placements, exports
+
+| Method | Path | Access | Body / query | Response |
+|---|---|---|---|---|
+| POST | `/stages/batch` | Admin, Facilitator | `candidateIds` (1–100), `reason` | Approves the next stage for each candidate (one transaction each, same triggers). `{ results: [{ candidateId, ok, toLabel | error }], approved, failed }` |
+| GET / POST | `/stages/me/review` | Candidate | POST: optional `note` | Ask the stream facilitator (or admins) for a stage review; emails them. `409 REVIEW_ALREADY_REQUESTED` if one is open. Any stage decision resolves it. |
+| GET | `/stages/placements` | Admin, Facilitator (own streams) | – | Hires reported by recruiters, pending first |
+| POST | `/stages/placements/:id` | Admin, Facilitator (own streams) | `approve`, optional `note` | Approve: records an official decision Work Ready → Placed (`409 PLACEMENT_STAGE` if the candidate is not Work Ready). The recruiter is emailed either way. |
+| GET | `/stages/decisions/export.csv` / `.pdf` | Admin, Facilitator | Optional `candidateId`, `from`, `to` | The stage audit trail as a download. CSV cells are protected against spreadsheet formula injection. |
+
+`GET /stages/candidates` rows also include `daysInStage`, `targetDays`, `overdue` (past the stage's target days), `reviewRequested` and `pendingPlacement`.
+
+## Recruiter: interviews, hires, search and exports
+
+| Method | Path | Access | Body / query | Response |
+|---|---|---|---|---|
+| GET | `/recruiter/talent` | Recruiter | Also `skills` (comma list, all required), `cohort`, `documents` (`cv` | `certificate` | `any`), `sort` (`name` | `stage`) | Adds `cohorts` and `skills` filter options |
+| POST | `/recruiter/interviews` | Recruiter | `candidateId`, `company`, `roleTitle`, optional `message`, `proposedAt`, `mode` | `201 { interview }`; candidate is emailed. Published candidates only; one pending request per recruiter and candidate. |
+| POST | `/recruiter/interviews/:id/withdraw` | Recruiter (own) | – | Withdraws a pending request |
+| POST | `/recruiter/placements` | Recruiter | `candidateId`, `company`, `roleTitle`, optional `startDate`, `note` | `201`; the stream facilitator is emailed to confirm |
+| GET | `/recruiter/shortlist/export.csv` / `.pdf` | Recruiter | – | The private shortlist with notes |
+
+## Career tools (`/career`)
+
+| Method | Path | Access | Body | Response |
+|---|---|---|---|---|
+| GET / PUT | `/career/cv` | Candidate | PUT: `cv` (structured CV) | CV builder data (prefilled from the profile and portfolio on first use). Links must be https. |
+| GET | `/career/cv/pdf` | Candidate | `?save=1` to store it | The CV as PDF; with `save=1`, stored in the candidate's documents (`source: cv_builder`) |
+| GET / POST | `/career/mock-interviews` | Candidate (10 per hour) | `jobTitle`, optional `jobDescription`, `fileId` or `useBuilder`, `consent` | Five role-specific questions (AI when `ANTHROPIC_API_KEY` is set; otherwise a question bank). CV content is only sent to the AI with `consent: true`. |
+| POST | `/career/mock-interviews/:id/answers` | Owner | `answers` (one per question) | AI feedback (overall, strengths, improvements, per-question tip, readiness) or a self-review checklist without AI |
+| GET | `/career/interviews` | Candidate (own), Recruiter (own), Support/Admin (all), Facilitator (own streams) | – | Interview requests |
+| POST | `/career/interviews/:id/respond` | Candidate | `accept`, optional `note` | Accept or decline; the recruiter is emailed |
+
+## Reports (`/reports`, admin; facilitators see their streams)
+
+| Method | Path | Query | Response |
+|---|---|---|---|
+| GET | `/reports/programme` | Optional `stream`, `cohort` | Totals, average days per stage (completed spans and "so far"), placement and completion rates by stream and cohort, average days to Placed / Completed, candidates past their stage target |
+| GET | `/reports/programme/export.csv` | `type` = `candidates` | `streams` | `cohorts` | `stages` | CSV download |
+
+## Privacy / POPIA (`/privacy`)
+
+| Method | Path | Access | Response |
+|---|---|---|---|
+| GET | `/privacy/export-data` | Any signed-in user | JSON download of everything held about the user (password hash excluded) |
+| POST | `/privacy/acknowledge` | Any | Records that the privacy notice was read |
+| GET / POST / DELETE | `/privacy/deletion-request` | Any | View, create (optional `reason`) or cancel your own deletion request. Admins are emailed. |
+| GET | `/privacy/requests` | Admin | All deletion requests |
+| POST | `/privacy/requests/:id` | Admin | `action` = `complete` (anonymise: personal data and files removed, audit records kept but no longer identify the person; the account is deactivated) or `decline` (reason required). Admins can't handle their own request. |
+
 ## Portfolio documents and AI CV tailoring (`/portfolio`)
 
 | Method | Path | Access | Body | Response |
@@ -128,7 +180,7 @@ Stages: `enrolled` → `training` → `work_ready` → `placed` → `completed`.
 | POST | `/workflow/requests/:id/priority` | Staff | `priority`, `note?` | `{ request }`. Recalculates the SLA due date. |
 | POST | `/workflow/requests/:id/messages` | Owner or staff | `body`, `isInternal?` (staff only) | `201 { autoTransitioned }`. A candidate reply on *Waiting for Candidate* automatically moves the request back to *In Progress*. |
 | GET | `/workflow/requests/:id/history` | Owner or staff | – | Audit trail. Candidates don't see internal notes or assignment entries. |
-| POST | `/workflow/db-probe` | Admin | `requestId`, `toStatus`, `withAudit` | Skips application validation and sends raw SQL to SQLite. **Always rolled back.** Returns `409 DB_ILLEGAL_TRANSITION` when the database trigger blocks the move. |
+| POST | `/workflow/db-probe` | Admin | `requestId`, `toStatus`, `withAudit` | Skips application validation and sends raw SQL to the database. **Always rolled back.** Returns `409 DB_ILLEGAL_TRANSITION` when the database trigger blocks the move. |
 
 **Transition pipeline:** `BEGIN IMMEDIATE`, then load and authorise, check the application rules, issue an admin override token if needed, insert the `audit_log` row, `UPDATE requests` (the trigger re-checks the move), add any message, and `COMMIT`. If any step fails, everything is rolled back.
 

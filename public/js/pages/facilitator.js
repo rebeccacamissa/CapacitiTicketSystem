@@ -20,7 +20,7 @@ async function load() {
   const kpis = [
     ['Candidates', pipe.total, 'users'],
     ['Awaiting review', pipe.awaitingReview, 'hourglass'],
-    ['In training', pipe.byStage.training, 'book'],
+    ['Past stage target', pipe.overdue, 'clock'],
     ['Work ready', pipe.byStage.work_ready, 'checkCircle'],
   ];
   document.getElementById('fac-kpis').innerHTML = kpis.map(([label, n, ic]) => `
@@ -28,7 +28,7 @@ async function load() {
       <p class="mt-3 font-display text-4xl font-semibold tabular-nums" data-count="${n}">0</p></article>`).join('');
   countUp(document.getElementById('fac-kpis'));
 
-  const ready = list.candidates.filter((c) => c.readyForReview);
+  const ready = list.candidates.filter((c) => c.readyForReview || c.reviewRequested);
   document.getElementById('fac-ready').innerHTML = ready.length ? ready.map((c) => `
     <li><a href="/stage-decisions?candidate=${c.id}" class="block rounded-2xl border border-ok/25 bg-ok/[0.06] p-3 transition hover:bg-ok/10">
       ${candidateCell(c)}<span class="mt-2 flex flex-wrap items-center gap-1 pl-12 text-xs text-white/70">${stageBadge(c.stage, c.stageLabel)}${icon('arrowRight', 'h-3.5 w-3.5')}${stageBadge(c.nextStage.key, c.nextStage.label)}</span></a></li>`).join('')
@@ -46,7 +46,7 @@ function renderRows() {
     <tr>
       <td class="py-3 pr-3">${candidateCell(c)}</td>
       <td class="py-3 pr-3 text-white/70">${esc(c.stream || '')}</td>
-      <td class="py-3 pr-3">${stageBadge(c.stage, c.stageLabel)}${c.readyForReview ? ` <span class="badge bg-ok/15 text-ok">${t('Ready')}</span>` : ''}</td>
+      <td class="py-3 pr-3">${stageBadge(c.stage, c.stageLabel)}${c.readyForReview ? ` <span class="badge bg-ok/15 text-ok">${t('Ready')}</span>` : ''}${c.reviewRequested ? ` <span class="badge bg-salmon/20 text-salmon-50">${t('Review requested')}</span>` : ''}${c.overdue ? ` <span class="badge bg-warn/15 text-warn" title="${t('{days} days in stage (target {target})', { days: c.daysInStage, target: c.targetDays })}">${t('{days} days', { days: c.daysInStage })}</span>` : ''}</td>
       <td class="py-3 pr-3">${evidenceBar(c.evidenceDone, c.evidenceTotal)}</td>
       <td class="py-3 text-right"><span class="flex flex-col items-end gap-1">
         <a href="/candidates?id=${c.id}" class="btn btn-ghost btn-sm">${t('Evidence')}</a>

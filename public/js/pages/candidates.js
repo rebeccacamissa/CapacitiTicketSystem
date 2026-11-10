@@ -96,6 +96,12 @@ async function select(id) {
         toast(completed ? 'Requirement verified' : 'Requirement unmarked', 'success');
       } catch (err) { toast(err.message, 'error'); throw err; }
     },
+    onLinkEvidence: async (requirementId, fileId) => {
+      try {
+        roadmap.update(await api(`/progress/${id}/requirements/${requirementId}/evidence`, { method: 'PUT', body: { fileId } }));
+        toast(fileId ? 'Evidence document linked' : 'Evidence document unlinked', 'success');
+      } catch (err) { toast(err.message, 'error'); }
+    },
   });
   roadmap.update(await api(`/progress/${id}`));
 }

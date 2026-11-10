@@ -50,9 +50,11 @@ function fromDbError(err) {
       enforcedBy: 'database-trigger',
     });
   }
-  if (/UNIQUE constraint failed/.test(msg)) return conflict('DUPLICATE', 'That record already exists');
-  if (/FOREIGN KEY constraint failed/.test(msg)) return badRequest('A referenced record does not exist');
-  if (/CHECK constraint failed/.test(msg)) return badRequest('A field failed database validation');
+  // Postgres SQLSTATE codes
+  if (err?.code === '23505') return conflict('DUPLICATE', 'That record already exists');
+  if (err?.code === '23503') return badRequest('A referenced record does not exist');
+  if (err?.code === '23514' || err?.code === '23502') return badRequest('A field failed database validation');
+  if (err?.code === '22P02' || err?.code === '22007' || err?.code === '22008') return badRequest('A value has the wrong format');
   return null;
 }
 

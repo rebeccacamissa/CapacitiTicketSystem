@@ -4,9 +4,9 @@
 
 - **Run:** `npm test` gives a summary; `npm run test:report` gives the full report.
 - **Framework:** Node's built-in test runner (`node:test` + `node:assert`). No extra test dependencies.
-- **Scope:** end-to-end API tests. Each run starts the real Express app on a random port against a fresh **in-memory SQLite database**, then makes real HTTP calls with cookies.
+- **Scope:** end-to-end API tests. Each run starts the real Express app on a random port against a fresh **in-memory PostgreSQL database (PGlite)**, then makes real HTTP calls with cookies.
 
-**Latest run: 34 passed, 0 failed** (21 core + 3 recruiter + 10 stages). The full output is in [test-results.txt](test-results.txt).
+**Latest run: 47 passed, 0 failed** (21 core + 2 recruiter + 10 stages + 14 features). The full output is in [test-results.txt](test-results.txt).
 
 | # | Test | What it proves |
 |---|---|---|
@@ -15,7 +15,7 @@
 | 3 | Candidate creates request with REQ-YYYY-NNNN reference | Reference generator; request starts as *Open* |
 | 4 | Candidates cannot see other candidates' requests | Ownership enforced (404, and empty lists) |
 | 5 | Illegal transition Open → Closed is rejected with 409 | `ILLEGAL_STATUS_TRANSITION`; database left unchanged |
-| 6 | DB probe proves the trigger blocks illegal transitions independently | `DB_ILLEGAL_TRANSITION` from SQLite itself; the probe is admin-only |
+| 6 | DB probe proves the trigger blocks illegal transitions independently | `DB_ILLEGAL_TRANSITION` from the database itself; the probe is admin-only |
 | 7 | Full workflow with audit trail + candidate auto-transition on reply | Open → Assigned → In Progress → Waiting → In Progress → Resolved → Closed. Audit rows are in order, a resolution is required, internal notes are hidden from candidates, and the roadmap shows the open blocker. |
 | 8 | Admin override is allowed, audited, and one-shot | Support can't override; admin can; the token is used up |
 | 9 | Audit log is immutable | UPDATE and DELETE are rejected by triggers |
@@ -32,7 +32,7 @@
 | 20 | Language preference is saved and Cammy answers in that language | isiZulu reply; translated suggestion buttons still send the English intent |
 | 21 | Extended accessibility preferences validate | High contrast, text size and font accepted; invalid values rejected |
 
-**Recruiter tests** (`tests/recruiter.test.js`, 3) cover publishing, recruiter-only access and unpublishing.
+**Recruiter tests** (`tests/recruiter.test.js`, 2) cover publishing, recruiter-only access and unpublishing.
 
 **Stage, facilitator, portfolio and AI tests** (`tests/stages.test.js`, 10):
 
@@ -48,6 +48,25 @@
 | S8 | Recruiter shortlist | Saved with a note; private to each recruiter; unpublished candidates can't be added |
 | S9 | AI CV tailoring without a key | Consent required; `503 AI_NOT_CONFIGURED`; reviewed drafts save as `ai_tailored` |
 | S10 | Invented-number check | Numbers not in the original CV are flagged |
+
+**Production-readiness feature tests** (`tests/features.test.js`, 14):
+
+| # | Test | What it proves |
+|---|---|---|
+| F1 | Demo shortcuts off unless `DEMO_MODE=true` | Demo accounts hidden; demo sign-in returns 404 |
+| F2 | Password reset | Same response for unknown and known emails; email logged; weak passwords rejected; tokens are single-use and expire |
+| F3 | Candidate-requested review | Facilitator is alerted (notification and email); a stage decision resolves the request |
+| F4 | Batch approval | One shared note; per-candidate results; out-of-scope ids fail safely |
+| F5 | Stage targets | Candidates past the target days are flagged in candidates and pipeline |
+| F6 | Evidence linking | Staff can link only the candidate's own document; "What's next" guidance is returned |
+| F7 | Interview requests | Only to published candidates; no duplicates; only the invited candidate can respond; staff see them |
+| F8 | Placements | Recruiter reports; confirmation only from Work Ready; confirming records an official decision to Placed |
+| F9 | Talent filters | Skills (all required), cohort, documents |
+| F10 | Exports | Shortlist and audit trail as CSV and PDF; spreadsheet formulas neutralised; candidates blocked |
+| F11 | Programme reports | Stage times, placement rates, velocity, CSV; facilitator scoping; recruiters blocked |
+| F12 | CV builder | Prefill, validation (https links), PDF download and saving to documents |
+| F13 | Mock interview without AI | Question bank, answer validation, self-review feedback, owner-only |
+| F14 | POPIA | Data export (no password hash), deletion request, admin anonymisation keeps the audit trail and blocks sign-in |
 
 ## 2. Database enforcement demonstration
 
@@ -88,8 +107,10 @@ Every page was opened in headless Chrome at 1440 px (desktop) and 390 px (mobile
 | Screen reader | Run NVDA (Windows) or VoiceOver (Mac) on registration, new request and request detail; check labels, errors and announcements. |
 | Read-aloud and voice input | Chrome or Edge with a microphone. Voices in isiZulu, isiXhosa and Sepedi depend on what's installed on the device. |
 | Translations | A native speaker of each language should read every screen. |
-| AI CV tailoring | Set `ANTHROPIC_API_KEY`, upload a PDF CV as Lerato, tailor it for a real job advert, and compare the draft line by line with the original: nothing should be invented or inflated. |
-| Facilitator journey on mobile | The facilitator, stage-decision and shortlist pages were checked at 1440 px only. |
+| AI CV tailoring and AI interviewer | Set `ANTHROPIC_API_KEY`, upload a PDF CV as Lerato, tailor it for a real job advert, and compare the draft line by line with the original: nothing should be invented or inflated. Then run an AI practice interview. |
+| Real email delivery | Set `RESEND_API_KEY` and a verified `EMAIL_FROM`, then use "Forgot your password?" and make a stage decision; check both emails arrive and links work. |
+| Neon | Set `DATABASE_URL`, run `npm run db:copy-sqlite` or `npm run db:seed`, redeploy, and confirm the data survives. |
+| Mobile | New and changed pages were checked in headless Chrome at 390 px: no horizontal page overflow (measured) and no script errors. Real-device testing is still recommended. |
 
 ## 4. Bugs found during testing and fixed
 

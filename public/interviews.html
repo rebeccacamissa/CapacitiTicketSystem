@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Interview requests · CAPACITI Support</title>
+  <link rel="icon" href="/assets/logo-mark.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <main id="main" class="opacity-0 space-y-6" data-title="Interview requests" data-subtitle="Recruiters and candidates" data-easy="Interview invitations sent by recruiters, and the candidates' answers.">
+    <section class="card">
+      <div class="flex flex-wrap items-end justify-between gap-3">
+        <div><h2 class="text-xl">Interview requests</h2><p id="iv-scope" class="mt-1 text-sm text-white/55"></p></div>
+        <div class="flex flex-wrap gap-2" role="group" aria-label="Filter by status" id="iv-filter"></div>
+      </div>
+      <ul id="iv-list" class="stagger mt-5 space-y-2" aria-live="polite"><li class="skeleton h-16"></li></ul>
+    </section>
+  </main>
+  <script type="module" src="/js/pages/interviews.js"></script>
+</body>
+</html>

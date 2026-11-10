@@ -33,7 +33,7 @@ function clearAuthCookie(res) {
 }
 
 /** Requires a valid token AND an active user; re-reads role from DB so role changes apply immediately. */
-function authenticate(req, res, next) {
+async function authenticate(req, res, next) {
   const header = req.get('authorization') || '';
   const token = req.cookies?.[COOKIE_NAME] || (header.startsWith('Bearer ') ? header.slice(7) : null);
   if (!token) return next(unauthorized());
@@ -45,9 +45,10 @@ function authenticate(req, res, next) {
     return next(unauthorized('Your session has expired. Please sign in again.'));
   }
 
-  const user = getDb()
-    .prepare('SELECT id, full_name, first_name, email, role, is_active, gender, avatar_config, preferences, tour_done, language, must_change_password FROM users WHERE id = ?')
-    .get(payload.sub);
+  let user;
+  try {
+    user = await getDb().one('SELECT id, full_name, first_name, email, role, is_active, gender, avatar_config, preferences, tour_done, language, must_change_password, privacy_ack_at FROM users WHERE id = ?', payload.sub);
+  } catch (err) { return next(err); }
   if (!user || !user.is_active) return next(unauthorized('Account not found or deactivated'));
 
   req.user = {
@@ -62,6 +63,7 @@ function authenticate(req, res, next) {
     tourDone: !!user.tour_done,
     language: user.language || 'en',
     mustChangePassword: !!user.must_change_password,
+    privacyAcknowledged: !!user.privacy_ack_at,
   };
 
   // Temporary-password accounts may only change their password (or read/sign out) until they do.

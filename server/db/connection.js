@@ -1,158 +1,158 @@
 'use strict';
 /**
- * SQLite connection (Node's built-in node:sqlite — no native build required).
+ * Postgres connection layer.
+ *
+ *  - DATABASE_URL set (production, e.g. Neon): a `pg` connection pool.
+ *  - Not set (local development and tests): PGlite, a real Postgres engine running
+ *    in-process. Data is kept in PGLITE_DIR (default ./data/pglite), or in memory.
+ *
+ * Every query uses `?` placeholders (converted to $1, $2… here) and returns plain
+ * rows. All writes that must happen together go through `db.tx(async (t) => …)`.
+ * Business rules (the ticket state machine, stage decisions, audit immutability)
+ * are enforced by triggers in schema.sql, exactly as before.
  * Owner: Member C
  */
 const fs = require('node:fs');
 const path = require('node:path');
-const { DatabaseSync } = require('node:sqlite');
 
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
-function migrateUserRoles(db) {
-  const table = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'").get();
-  if (!table || table.sql.includes("'facilitator'")) return;
-
-  const dependentTriggers = db.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND sql LIKE '%users%'").all();
-  db.exec('PRAGMA foreign_keys = OFF;');
-  for (const trigger of dependentTriggers) {
-    db.prepare('DROP TRIGGER ' + `"${trigger.name.replace(/"/g, '""')}"`).run();
-  }
-  try {
-    db.exec(`
-      BEGIN IMMEDIATE;
-      CREATE TABLE users_recruiter_migration (
-        id             INTEGER PRIMARY KEY AUTOINCREMENT,
-        full_name      TEXT    NOT NULL CHECK (length(trim(full_name)) BETWEEN 2 AND 120),
-        email          TEXT    NOT NULL UNIQUE COLLATE NOCASE,
-        password_hash  TEXT    NOT NULL,
-        role           TEXT    NOT NULL DEFAULT 'candidate'
-                               CHECK (role IN ('candidate', 'support', 'admin', 'recruiter', 'facilitator')),
-        is_active      INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
-        first_name     TEXT,
-        surname        TEXT,
-        date_of_birth  TEXT    CHECK (date_of_birth IS NULL OR date_of_birth GLOB '[12][0-9][0-9][0-9]-[01][0-9]-[0-3][0-9]'),
-        gender         TEXT    NOT NULL DEFAULT 'prefer-not'
-                               CHECK (gender IN ('female', 'male', 'non-binary', 'prefer-not')),
-        avatar_config  TEXT    CHECK (avatar_config IS NULL OR json_valid(avatar_config)),
-        preferences    TEXT    NOT NULL DEFAULT '{}' CHECK (json_valid(preferences)),
-        tour_done      INTEGER NOT NULL DEFAULT 0 CHECK (tour_done IN (0, 1)),
-        accessibility  TEXT    NOT NULL DEFAULT '{}' CHECK (json_valid(accessibility)),
-        language       TEXT    NOT NULL DEFAULT 'en' CHECK (language IN ('en', 'zu', 'xh', 'af', 'nso')),
-        must_change_password INTEGER NOT NULL DEFAULT 0 CHECK (must_change_password IN (0, 1)),
-        created_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-      );
-      INSERT INTO users_recruiter_migration
-        SELECT id, full_name, email, password_hash, role, is_active, first_name, surname,
-               date_of_birth, gender, avatar_config, preferences, tour_done, accessibility,
-               language, must_change_password, created_at
-        FROM users;
-      DROP TABLE users;
-      ALTER TABLE users_recruiter_migration RENAME TO users;
-      COMMIT;
-    `);
-  } catch (error) {
-    if (db.isTransaction) db.exec('ROLLBACK;');
-    throw error;
-  } finally {
-    db.exec('PRAGMA foreign_keys = ON;');
-    for (const trigger of dependentTriggers) db.exec(trigger.sql);
-  }
-}
-
-/**
- * Databases created before official stages existed had five milestones
- * (screening, onboarding, training, work_ready, placed). Re-key them in place to the
- * stage-aligned roadmap, keeping every candidate's verified requirement progress.
- * Returns true when it ran, so stages can be backfilled once the schema exists.
- */
-function migrateMilestones(db) {
-  const hasOld = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'milestones'").get()
-    && db.prepare("SELECT 1 FROM milestones WHERE key = 'screening'").get();
-  if (!hasOld) return false;
-  const id = (key) => db.prepare('SELECT id FROM milestones WHERE key = ?').get(key)?.id;
-  transaction(db, () => {
-    const [screening, onboarding, training, workReady, placed] = ['screening', 'onboarding', 'training', 'work_ready', 'placed'].map(id);
-    db.exec('UPDATE milestones SET sort_order = sort_order + 100;');
-    // Screening + onboarding become "Enrolled" (onboarding requirements follow as items 5-8).
-    db.prepare('UPDATE milestone_requirements SET milestone_id = ?, sort_order = sort_order + 4 WHERE milestone_id = ?').run(screening, onboarding);
-    db.prepare('DELETE FROM milestones WHERE id = ?').run(onboarding);
-    // Partner matching and the agreement are exit criteria of Work Ready; Placed keeps "First day".
-    db.prepare("UPDATE milestone_requirements SET milestone_id = ?, sort_order = 4 WHERE milestone_id = ? AND label = 'Matched with a corporate partner'").run(workReady, placed);
-    db.prepare("UPDATE milestone_requirements SET milestone_id = ?, sort_order = 5 WHERE milestone_id = ? AND label = 'Internship agreement signed'").run(workReady, placed);
-    db.prepare("UPDATE milestone_requirements SET sort_order = 1 WHERE milestone_id = ? AND label = 'First day at host company'").run(placed);
-    const set = db.prepare('UPDATE milestones SET key = ?, title = ?, description = ?, sort_order = ? WHERE id = ?');
-    set.run('enrolled', 'Enrolled', 'You are accepted into a cohort and set up for training.', 1, screening);
-    set.run('training', 'In Training', 'You attend training, complete modules and pass assessments.', 2, training);
-    set.run('work_ready', 'Work Ready', 'You are prepared for the workplace and matched with a corporate partner.', 3, workReady);
-    set.run('placed', 'Placed', 'You are on your internship with a corporate partner.', 4, placed);
-    db.exec("UPDATE OR IGNORE user_badges SET badge_key = 'milestone_training' WHERE badge_key = 'milestone_onboarding';");
-    db.exec("DELETE FROM user_badges WHERE badge_key IN ('milestone_screening', 'milestone_onboarding');");
-  });
-  return true;
-}
-
-/**
- * One-off: give existing candidates an official stage that matches the progress they
- * already had (first stage whose exit criteria are incomplete). Recorded as a system
- * 'initial' decision so the stage audit trail explains where it came from.
- */
-function backfillStages(db) {
-  const { stageFromEvidence } = require('../modules/stages/stage.rules');
-  transaction(db, () => {
-    const candidates = db.prepare("SELECT id FROM users WHERE role = 'candidate' AND id NOT IN (SELECT candidate_id FROM candidate_stages)").all();
-    for (const { id } of candidates) {
-      const stage = stageFromEvidence(db, id);
-      if (stage === 'enrolled') continue;
-      db.prepare("INSERT INTO stage_decisions (candidate_id, from_stage, to_stage, direction, decided_by, reason) VALUES (?, NULL, ?, 'initial', NULL, ?)")
-        .run(id, stage, 'Imported from verified requirement progress when official stages were introduced.');
-      db.prepare('INSERT INTO candidate_stages (candidate_id, stage) VALUES (?, ?)').run(id, stage);
+/** Convert `?` placeholders to `$n`, skipping quoted strings and identifiers. */
+function toPg(sql) {
+  let out = '';
+  let n = 0;
+  let quote = null;
+  for (let i = 0; i < sql.length; i += 1) {
+    const ch = sql[i];
+    if (quote) {
+      out += ch;
+      if (ch === quote) quote = null;
+    } else if (ch === "'" || ch === '"') {
+      quote = ch;
+      out += ch;
+    } else if (ch === '?') {
+      n += 1;
+      out += `$${n}`;
+    } else {
+      out += ch;
     }
-  });
+  }
+  return out;
 }
 
-function openDatabase(dbPath) {
-  if (dbPath !== ':memory:') fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-  const db = new DatabaseSync(dbPath, { enableForeignKeyConstraints: true });
-  db.exec('PRAGMA foreign_keys = ON;');
-  db.exec('PRAGMA busy_timeout = 5000;');
-  if (dbPath !== ':memory:') db.exec('PRAGMA journal_mode = WAL;');
-  migrateUserRoles(db);
-  const migrated = migrateMilestones(db);
-  db.exec(fs.readFileSync(SCHEMA_PATH, 'utf8'));
-  if (migrated) backfillStages(db);
+const flat = (params) => (params.length === 1 && Array.isArray(params[0]) ? params[0] : params);
+
+/** Wrap a low-level `query(text, values)` function in the app's small query API. */
+function wrap(query, extra = {}) {
+  const api = {
+    /** All rows. */
+    async all(sql, ...params) { return (await query(toPg(sql), flat(params))).rows; },
+    /** First row or undefined. */
+    async one(sql, ...params) { return (await query(toPg(sql), flat(params))).rows[0]; },
+    /** Write; returns { changes, rows } (use RETURNING to get ids back). */
+    async run(sql, ...params) {
+      const r = await query(toPg(sql), flat(params));
+      return { changes: r.rowCount ?? r.affectedRows ?? 0, rows: r.rows };
+    },
+    /** Insert … RETURNING id, returning the id. */
+    async insert(sql, ...params) {
+      const r = await query(`${toPg(sql)} RETURNING id`, flat(params));
+      return r.rows[0].id;
+    },
+    ...extra,
+  };
+  return api;
+}
+
+const TYPE_PARSERS = {
+  20: (v) => (v === null ? null : Number(v)), // int8 (COUNT, SUM) -> number
+  1700: (v) => (v === null ? null : Number(v)), // numeric (AVG, ROUND) -> number
+};
+
+async function createPglite(dataDir) {
+  const { PGlite } = await import('@electric-sql/pglite');
+  if (dataDir) fs.mkdirSync(dataDir, { recursive: true });
+  const pg = new PGlite(dataDir || undefined, { parsers: TYPE_PARSERS });
+  await pg.waitReady;
+  const query = (text, values) => pg.query(text, values);
+  const db = wrap(query, {
+    kind: 'pglite',
+    async exec(sql) { await pg.exec(sql); },
+    async tx(fn) {
+      return pg.transaction(async (raw) => {
+        const t = wrap((text, values) => raw.query(text, values), { kind: 'pglite', inTx: true, exec: (sql) => raw.exec(sql) });
+        t.tx = (inner) => inner(t); // nested tx() calls reuse the open transaction
+        return fn(t);
+      });
+    },
+    async close() { await pg.close(); },
+  });
+  return db;
+}
+
+async function createPool(url) {
+  const pgLib = require('pg');
+  pgLib.types.setTypeParser(20, TYPE_PARSERS[20]);
+  pgLib.types.setTypeParser(1700, TYPE_PARSERS[1700]);
+  const local = /localhost|127\.0\.0\.1/.test(url);
+  const pool = new pgLib.Pool({ connectionString: url, max: 10, ssl: local ? false : { rejectUnauthorized: false } });
+  pool.on('error', (err) => console.error('[db] idle client error', err.message));
+  const db = wrap((text, values) => pool.query(text, values), {
+    kind: 'postgres',
+    async exec(sql) { await pool.query(sql); },
+    async tx(fn) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const t = wrap((text, values) => client.query(text, values), { kind: 'postgres', inTx: true, exec: (sql) => client.query(sql) });
+        t.tx = (inner) => inner(t);
+        const out = await fn(t);
+        await client.query('COMMIT');
+        return out;
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+      } finally {
+        client.release();
+      }
+    },
+    async close() { await pool.end(); },
+  });
   return db;
 }
 
 /**
- * Run `fn` inside BEGIN IMMEDIATE ... COMMIT. Any thrown error triggers ROLLBACK.
- * IMMEDIATE takes the write lock up front, so concurrent transitions serialise.
+ * Open a database and apply the (idempotent) schema.
+ * @param {{ url?: string, dir?: string, memory?: boolean }} opts
  */
-function transaction(db, fn) {
-  db.exec('BEGIN IMMEDIATE TRANSACTION;');
-  try {
-    const result = fn();
-    db.exec('COMMIT;');
-    return result;
-  } catch (err) {
-    if (db.isTransaction) db.exec('ROLLBACK;');
-    throw err;
-  }
+async function openDatabase({ url, dir, memory } = {}) {
+  const db = url ? await createPool(url) : await createPglite(memory ? null : dir);
+  // Serialise schema setup across instances starting at the same time (Postgres advisory lock).
+  await db.tx(async (t) => {
+    await t.run('SELECT pg_advisory_xact_lock(424242)');
+    await t.exec(fs.readFileSync(SCHEMA_PATH, 'utf8'));
+  });
+  return db;
 }
+
+/** Run fn inside a transaction (kept for older call sites). */
+const transaction = (db, fn) => db.tx(fn);
 
 let instance = null;
 
-function getDb() {
-  if (!instance) {
-    const { dbPath } = require('../config/env');
-    instance = openDatabase(dbPath);
-  }
+async function initDb() {
+  if (instance) return instance;
+  const { databaseUrl, pgliteDir } = require('../config/env');
+  instance = await openDatabase({ url: databaseUrl || undefined, dir: pgliteDir });
   return instance;
 }
 
-/** Tests can inject an in-memory database. */
-function setDb(db) {
-  instance = db;
+function getDb() {
+  if (!instance) throw new Error('Database not initialised: call await initDb() first');
+  return instance;
 }
 
-module.exports = { openDatabase, transaction, getDb, setDb };
+/** Tests inject their own (in-memory) database. */
+function setDb(db) { instance = db; }
+
+module.exports = { openDatabase, initDb, getDb, setDb, transaction, toPg };

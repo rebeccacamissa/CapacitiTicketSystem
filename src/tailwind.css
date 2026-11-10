@@ -79,10 +79,13 @@
 }
 
 @layer components {
+  /* Keep absolutely-positioned descendants (e.g. sr-only labels) inside horizontal scrollers so they never widen the page. */
+  .overflow-x-auto { position: relative; }
   /* ---- Surfaces ---- */
-  .glass { @apply rounded-3xl border border-white/10 bg-white/[0.055] shadow-[0_8px_40px_-12px_rgb(0_0_0/0.6)] backdrop-blur-xl; }
+  /* min-width:0 lets cards shrink inside grid/flex layouts so wide tables scroll inside them instead of widening the page. */
+  .glass { @apply min-w-0 rounded-3xl border border-white/10 bg-white/[0.055] shadow-[0_8px_40px_-12px_rgb(0_0_0/0.6)] backdrop-blur-xl; }
   .glass-strong { @apply rounded-3xl border border-white/15 bg-night/80 shadow-2xl backdrop-blur-2xl; }
-  .card { @apply rounded-3xl border border-white/10 bg-white/[0.055] p-5 shadow-[0_8px_40px_-12px_rgb(0_0_0/0.6)] backdrop-blur-xl sm:p-6; }
+  .card { @apply min-w-0 rounded-3xl border border-white/10 bg-white/[0.055] p-5 shadow-[0_8px_40px_-12px_rgb(0_0_0/0.6)] backdrop-blur-xl sm:p-6; }
   .lift { @apply transition duration-300 ease-out hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.08] hover:shadow-[0_18px_50px_-15px_rgb(97_21_208/0.55)]; }
 
   /* Animated gradient border on hover */

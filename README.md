@@ -24,13 +24,18 @@ CAPACITI candidates raise support needs (connectivity, platform access, attendan
 
 | Area | Highlights |
 |---|---|
-| **Workflow engine** | Open → Assigned → In Progress ⇄ Waiting for Candidate → Resolved → Closed (→ Reopened). Every change runs in a **database transaction**, and **SQLite triggers** reject illegal jumps, missing assignees or resolutions, and any change without an audit record. Admin overrides are one-shot and audited. |
+| **Workflow engine** | Open → Assigned → In Progress ⇄ Waiting for Candidate → Resolved → Closed (→ Reopened). Every change runs in a **database transaction**, and **PostgreSQL triggers** reject illegal jumps, missing assignees or resolutions, and any change without an audit record. Admin overrides are one-shot and audited. |
 | **Requests** | Automatic `REQ-2026-0001` references, SLA due dates by priority, search, filters, sorting, pagination, attachments with real file-type checks, internal notes, and 1–5 star satisfaction ratings |
 | **Candidate journey** | Animated 5-milestone roadmap (Screening → Onboarding → Training → Work Ready → Internship) with requirement tracking and alerts when open support cases may affect progress |
 | **Dashboards** | Support dashboard (queue, workload, 14-day trend, category and priority breakdowns, overdue cases, satisfaction) and admin control centre |
 | **Recruiter workspace** | Opt-in talent board, candidate profiles with verified programme credentials, published project portfolios and documents, and a private saved shortlist; recruiters cannot access support tickets |
 | **Official stages & facilitators** | Enrolled → In Training → Work Ready → Placed → Completed. Facilitators approve the next stage for their streams, one step at a time, with a reason; only admins can move a candidate back. Every decision is in an append-only stage audit trail, enforced by database triggers. Admin pipeline by stage and stream |
 | **Portfolio documents & AI CV tailoring** | Secure CV / project / certificate uploads, portfolio cards on the candidate dashboard, and an optional, consent-based AI assistant (Claude) that tailors a CV to a job without adding anything that isn't already true |
+| **Recruiter tools** | Talent search by skills, cohort, stage and documents; interview requests that candidates accept or decline; hire reports that a facilitator confirms as an official Placed decision; shortlist export to CSV and PDF |
+| **Facilitator workflow** | Approval inbox for batch stage approvals with one shared note; candidate-requested reviews; evidence documents linked to checklist items; target days per stage with "past target" flags |
+| **Career tools** | Guided CV builder that produces a clean PDF; interview practice with an AI interviewer (or a question bank when AI is off); a "What's next" card on the roadmap |
+| **Reports & privacy** | Programme reports (time per stage, placement rate by stream and cohort, time to placement) with CSV exports; stage audit trail as CSV or PDF; POPIA tools: download my data, deletion requests handled by an admin, a privacy notice at first sign-in |
+| **Accounts & email** | Password reset by email (single-use, 30-minute links), email notifications through Resend, and a production mode with demo shortcuts switched off |
 | **Live** | Server-Sent Events: tickets, notifications, roadmaps and the feed update without a refresh |
 | **Cammy** | An assistant that wears each user's avatar, has 7 moods, gives role-specific first-sign-in walkthroughs and answers from live data in 5 languages |
 | **Avatars** | Avatar studio with two art styles (Polished and the inclusive Classic), four looks, and badge-unlocked items |
@@ -45,10 +50,10 @@ CAPACITI candidates raise support needs (connectivity, platform access, attendan
 |---|---|
 | Frontend | HTML5, Tailwind CSS v4, vanilla JavaScript (ES modules, `fetch`), Server-Sent Events, Web Speech API |
 | Backend | Node.js 22.13+ (tested on 24), Express 5, modular middleware (auth, validation, rate limiting, errors) |
-| Database | SQLite via built-in `node:sqlite` (no native build), with foreign keys, CHECK constraints, triggers and explicit transactions |
+| Database | PostgreSQL (Neon in production via `DATABASE_URL`; embedded PGlite for local development and tests), with foreign keys, CHECK constraints, PL/pgSQL triggers, row locks and explicit transactions. Uploaded files are stored in the database. |
 | Security | `bcryptjs`, `jsonwebtoken`, `helmet`, `cookie-parser`, `dotenv` |
 | Avatars | DiceBear (Avataaars by Pablo Stanley; toonHead by Johan Melin, CC BY 4.0) |
-| Testing | Node's built-in test runner (34 end-to-end API tests on an in-memory database) |
+| Testing | Node's built-in test runner (47 end-to-end API tests on an in-memory Postgres database) |
 
 ## Quick start
 
@@ -56,8 +61,8 @@ CAPACITI candidates raise support needs (connectivity, platform access, attendan
 git clone https://github.com/rebeccacamissa/CapacitiTicketSystem.git
 cd CapacitiTicketSystem
 npm install
-cp .env.example .env        # set JWT_SECRET; DEMO_MODE=true enables one-click role sign-in
-npm run db:reset            # create the schema and load demo data
+cp .env.example .env        # set JWT_SECRET; optional DATABASE_URL (Neon); DEMO_MODE=true enables one-click role sign-in
+npm run db:reset            # create the schema and load demo data (embedded Postgres unless DATABASE_URL is set)
 npm start                   # builds the CSS, then serves http://localhost:3000
 ```
 
@@ -66,12 +71,15 @@ npm start                   # builds the CSS, then serves http://localhost:3000
 | Candidate | `lerato@example.com` (also `sipho@`, `zanele@`, `kagiso@`, `amahle@` at `example.com`) | `Capaciti@2026` |
 | Support / Manager | `thabo@capaciti.org.za`, `aisha@capaciti.org.za` | `Capaciti@2026` |
 | Administrator | `admin@capaciti.org.za` | `Capaciti@2026` |
+| Facilitator | `facilitator@capaciti.org.za` | `Capaciti@2026` |
+| Recruiter | `recruiter@capaciti.org.za` | `Capaciti@2026` |
 
 | Script | Purpose |
 |---|---|
 | `npm start` / `npm run dev` | Run the app (`dev` restarts automatically on changes) |
 | `npm test` / `npm run test:report` | Run the API tests / write the full report |
-| `npm run demo:illegal` | Show that SQLite blocks illegal transitions using raw SQL |
+| `npm run demo:illegal` | Show that the database blocks illegal ticket and stage changes using raw SQL |
+| `npm run db:copy-sqlite` | Copy data from an older SQLite database (`data/capaciti.db`) into Postgres |
 | `npm run db:reset` / `npm run db:seed` | Reset and reseed the database / seed only if empty |
 | `npm run i18n` | Rebuild translation dictionaries from `i18n-source/` |
 | `npm run build:css` / `npm run watch:css` | Build or watch the Tailwind CSS |

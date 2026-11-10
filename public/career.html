@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Career tools · CAPACITI Support</title>
+  <link rel="icon" href="/assets/logo-mark.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <main id="main" class="opacity-0 space-y-6" data-title="Career tools" data-subtitle="CV builder and interview practice" data-easy="Build a CV by filling in a form, then download it as a PDF. Practise answering interview questions and get tips.">
+    <nav class="flex flex-wrap gap-2" aria-label="Career tools">
+      <a href="#cv-builder" class="btn btn-ghost btn-sm">CV builder</a>
+      <a href="#mock" class="btn btn-ghost btn-sm">Interview practice</a>
+      <a href="/profile#cv-tailor" class="btn btn-ghost btn-sm">Tailor my CV for a job</a>
+    </nav>
+
+    <section id="cv-builder" class="card scroll-mt-28" aria-labelledby="cvb-title">
+      <div class="flex flex-wrap items-end justify-between gap-3">
+        <div><h2 id="cvb-title" class="text-xl">CV builder</h2>
+          <p class="mt-1 text-sm text-white/60">Fill in what is true about you. We turn it into a clean, one-column PDF that works with recruiters' application systems. No photo, ID number or age is needed.</p></div>
+        <p id="cvb-saved" class="text-xs text-white/50" aria-live="polite"></p>
+      </div>
+      <form id="cvb" class="mt-5 space-y-6" novalidate></form>
+    </section>
+
+    <section id="mock" class="card scroll-mt-28" aria-labelledby="mock-title">
+      <div class="flex flex-wrap items-center gap-2"><h2 id="mock-title" class="text-xl">Interview practice</h2><span id="mock-mode" class="badge"></span></div>
+      <p id="mock-intro" class="mt-1 text-sm text-white/60"></p>
+      <div id="mock-body" class="mt-5"></div>
+      <div class="mt-6 border-t border-white/10 pt-4">
+        <h3 class="text-sm font-semibold">Previous practice</h3>
+        <ul id="mock-history" class="mt-2 space-y-2"></ul>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="/js/pages/career.js"></script>
+</body>
+</html>

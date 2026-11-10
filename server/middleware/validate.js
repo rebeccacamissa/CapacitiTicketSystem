@@ -37,6 +37,15 @@ function validateValue(name, rule, raw) {
       if (!rule.values.includes(raw)) return { error: `${name} must be one of: ${rule.values.join(', ')}` };
       return { value: raw };
     }
+    case 'array': {
+      // { type: 'array', of: 'int' | 'string', min, max (items), itemMax (string length) }
+      if (!Array.isArray(raw)) return { error: `${name} must be a list` };
+      if (rule.min && raw.length < rule.min) return { error: `Choose at least ${rule.min}` };
+      if (rule.max && raw.length > rule.max) return { error: `Choose at most ${rule.max}` };
+      if (rule.of === 'int' && raw.some((x) => !Number.isInteger(x) || x < 1)) return { error: `${name} must be a list of ids` };
+      if (rule.of === 'string' && raw.some((x) => typeof x !== 'string' || (rule.itemMax && x.length > rule.itemMax))) return { error: `${name} must be a list of text values` };
+      return { value: raw };
+    }
     default:
       return { value: raw };
   }

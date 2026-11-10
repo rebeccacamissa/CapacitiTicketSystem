@@ -5,11 +5,10 @@
 ### Platform and scale
 | Limitation | Impact | Mitigation today |
 |---|---|---|
-| **SQLite** single-file database | Fine for one server and hundreds of users. It doesn't support running several server instances or very high write volumes. | WAL mode, `BEGIN IMMEDIATE` transactions and a busy timeout. Data access is isolated in services, which makes a move to PostgreSQL straightforward. |
-| `node:sqlite` is marked *experimental* in Node 24 | The API could change in a future Node release | `node` is pinned at version 22.13 or later in `engines`; the warning is suppressed in scripts |
+| **Embedded database without `DATABASE_URL`** | If `DATABASE_URL` is not set, the app uses an embedded Postgres (PGlite) whose files are wiped on hosts with temporary disks | Set `DATABASE_URL` (Neon) in production; the start-up log says which database is in use |
 | Live updates (SSE) and rate limits are **in-memory** | They work on a single instance only | Use Redis pub/sub and a shared rate-limit store when scaling out |
-| Files are stored on the local disk | They need a persistent volume; the free hosting tier loses them | Move to object storage such as S3 or Azure Blob |
-| No e-mail or SMS | Users only hear about updates inside the app | In-app notifications and live updates |
+| Files are stored in the database (5 MB each) | Simple and persistent, but large volumes of files make the database big | Move to object storage such as S3 or Azure Blob at scale |
+| Email needs a Resend key and a verified domain | Without them, emails are only written to the server log; no SMS | In-app notifications and live updates still work |
 
 ### Features
 | Limitation | Notes |
@@ -27,6 +26,9 @@
 | **No password reset by e-mail** | An admin resets passwords, which issues a temporary password. |
 | **Demo mode** | Must be switched off (`ALLOW_DEMO_IN_PRODUCTION=false`) for real users. |
 | **AI CV tailoring** is optional and off by default | Needs an `ANTHROPIC_API_KEY` on the server; each run is a paid API call. The candidate must consent before their CV is sent to Anthropic (POPIA: personal data leaves the platform). The model is instructed never to add skills, numbers or experience, every change is listed with the original wording, gaps are reported instead of added, numbers not in a text CV are flagged, and nothing is saved until the candidate confirms it is true. Even so, **the candidate remains responsible for checking the draft**. Word (.docx) CVs must be uploaded as PDF or pasted as text for tailoring. It was **not tested against the live API** in development (no key was available); the no-key path and the safeguards are covered by tests. |
+| **AI mock interviewer** | Same key, consent and cost as CV tailoring. Without a key it falls back to a fixed question bank and a self-review checklist. Not tested against the live API in development. |
+| **Neon and Resend not exercised from this machine** | The Postgres code is tested on the same engine (PGlite, PostgreSQL 18) and the email flow in "log only" mode; a real `DATABASE_URL` and `RESEND_API_KEY` still need a manual check after deployment (see TESTING.md). |
+| **Deleted accounts are anonymised, not erased** | Records the programme must keep (requests, audit log, stage decisions) remain, linked to "Deleted user #id". Confirm this retention approach with your information officer. |
 | **Stage evidence doesn't gate decisions** | By design, a facilitator can approve a stage with criteria still unticked (the gaps are shown and should be explained in the reason). |
 | **Stream names** | Facilitator scope matches the candidate's stream text exactly. Changing a candidate's stream moves them to a different facilitator. |
 
@@ -35,9 +37,9 @@
 ### Short term (before a production launch)
 1. **Native-speaker review** of all translations, then add **isiNdebele, siSwati, Tshivenda and Xitsonga**. The format is already set up for this: one file in `i18n-source/`, then `npm run i18n`.
 2. **An accessibility audit** with screen-reader users (NVDA, JAWS, VoiceOver) and people with disabilities from the cohort; fix what they find.
-3. **Self-service password reset** and **e-mail notifications** for important events: reply needed, resolved, overdue.
+3. **SMS notifications** for candidates with limited data (email and in-app notifications exist).
 4. **Browser tests** (e.g. Playwright with automated accessibility checks) alongside the existing API tests, run in **GitHub Actions** on every push.
-5. Turn off demo mode, change the seed passwords, and add **database backups** (a nightly SQLite backup to object storage).
+5. Turn off demo mode, change the seed passwords, and add **database backups** (Neon point-in-time restore, plus a periodic export).
 
 ### Medium term
 6. **PostgreSQL**, Redis (for live updates and rate limits) and object storage, so more than one server can run.

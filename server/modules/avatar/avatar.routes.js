@@ -9,7 +9,7 @@ const { renderSvg } = require('./render');
 
 const router = express.Router();
 
-router.get('/avatar.svg', (req, res) => {
+router.get('/avatar.svg', async (req, res) => {
   const c = String(req.query.c || '');
   let cfg = null;
   if (c && c.length <= 1200) {

@@ -43,6 +43,9 @@ function createApp() {
   app.use('/api/recruiter', require('./modules/recruiter/recruiter.routes'));
   app.use('/api/stages', require('./modules/stages/stage.routes'));
   app.use('/api/portfolio', require('./modules/portfolio/portfolio.routes'));
+  app.use('/api/career', require('./modules/career/career.routes'));
+  app.use('/api/reports', require('./modules/reports/reports.routes'));
+  app.use('/api/privacy', require('./modules/privacy/privacy.routes'));
   app.use('/api/admin', require('./modules/admin/admin.routes'));
   app.use('/api/cammy', require('./modules/cammy/cammy.routes'));
   app.use('/api/events', require('./realtime/realtime.routes'));

@@ -206,3 +206,35 @@ pw.addEventListener('submit', async (e) => {
   } catch (err) { toast(err.message, 'error'); showFieldErrors(pw, err.details?.fields); }
   setBusy(btn, false);
 });
+
+// ---- Privacy: account deletion request (POPIA) ---------------------------------
+async function loadDeletion() {
+  const box = document.getElementById('delete-box');
+  const { request } = await api('/privacy/deletion-request');
+  if (request && request.status === 'open') {
+    box.innerHTML = `<h3 class="font-semibold">Deletion requested</h3>
+      <p class="mt-1 text-sm text-white/60">${t('Requested {date}. An administrator will handle it and email you.', { date: fmtDate(request.createdAt) })}</p>
+      <button type="button" class="btn btn-ghost btn-sm mt-3" data-cancel-del>Cancel my request</button>`;
+  } else {
+    box.innerHTML = `<h3 class="font-semibold">Delete my account</h3>
+      <p class="mt-1 text-sm text-white/60">An administrator reviews the request. Your personal details are then removed.</p>
+      ${request && request.status === 'declined' ? `<p class="mt-2 text-xs text-warn">${t('Your last request was declined')}${request.handledNote ? `: <span translate="no">${esc(request.handledNote)}</span>` : ''}</p>` : ''}
+      <form class="mt-3 space-y-2" data-del-form><label for="del-reason" class="sr-only">Reason (optional)</label>
+        <input id="del-reason" name="reason" maxlength="1000" class="field" placeholder="Reason (optional)">
+        <button class="btn btn-sm border border-salmon/40 bg-salmon/10 text-salmon-50 hover:bg-salmon/25">Request deletion</button></form>`;
+  }
+}
+document.getElementById('delete-box').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!confirm(t('Ask for your account to be deleted? You will not be able to sign in once it is done.'))) return;
+  try {
+    await api('/privacy/deletion-request', { method: 'POST', body: { reason: e.target.reason.value.trim() || undefined } });
+    toast(t('Request sent to an administrator'), 'success');
+    loadDeletion();
+  } catch (err) { toast(err.message, 'error'); }
+});
+document.getElementById('delete-box').addEventListener('click', async (e) => {
+  if (!e.target.closest('[data-cancel-del]')) return;
+  try { await api('/privacy/deletion-request', { method: 'DELETE' }); toast(t('Request cancelled'), 'success'); loadDeletion(); } catch (err) { toast(err.message, 'error'); }
+});
+loadDeletion();

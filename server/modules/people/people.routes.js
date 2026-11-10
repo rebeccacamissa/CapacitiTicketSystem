@@ -16,7 +16,7 @@ router.get('/meta/options', (req, res) => res.json(options));
 router.use(authenticate);
 
 // ---- Own profile ------------------------------------------------------------
-router.get('/profile/me', (req, res) => res.json({ profile: svc.getProfile(getDb(), req.user.id) }));
+router.get('/profile/me', async (req, res) => res.json({ profile: await svc.getProfile(getDb(), req.user.id) }));
 
 router.patch(
   '/profile/me',
@@ -26,31 +26,32 @@ router.patch(
     dateOfBirth: DOB_RULE,
     gender: { type: 'enum', values: ['female', 'male', 'non-binary', 'prefer-not'] },
   }),
-  (req, res) => {
+  async (req, res) => {
     const db = getDb();
-    const cur = svc.getProfile(db, req.user.id);
-    if (req.body.gender) db.prepare('UPDATE users SET gender = ? WHERE id = ?').run(req.body.gender, req.user.id);
+    const cur = await svc.getProfile(db, req.user.id);
+    if (req.body.gender) await db.run('UPDATE users SET gender = ? WHERE id = ?', req.body.gender, req.user.id);
     const first = req.body.firstName || cur.firstName;
     const last = req.body.surname || cur.surname;
-    db.prepare('UPDATE users SET first_name = ?, surname = ?, full_name = ?, date_of_birth = COALESCE(?, date_of_birth) WHERE id = ?')
-      .run(first, last, `${first} ${last}`, req.body.dateOfBirth || null, req.user.id);
-    res.json({ profile: svc.getProfile(db, req.user.id) });
+    await db.run('UPDATE users SET first_name = ?, surname = ?, full_name = ?, date_of_birth = COALESCE(?, date_of_birth) WHERE id = ?',
+      first, last, `${first} ${last}`, req.body.dateOfBirth || null, req.user.id);
+    res.json({ profile: await svc.getProfile(db, req.user.id) });
   }
 );
 
 // ---- Birthdays & notifications ----------------------------------------------
-router.get('/people/birthdays', authorize('candidate', 'support', 'admin', 'facilitator'), (req, res) => res.json(svc.birthdays(getDb())));
-router.get('/notifications', (req, res) => res.json({ items: svc.notifications(getDb(), req.user) }));
+router.get('/people/birthdays', authorize('candidate', 'support', 'admin', 'facilitator'), async (req, res) => res.json(await svc.birthdays(getDb())));
+router.get('/notifications', async (req, res) => res.json({ items: await svc.notifications(getDb(), req.user) }));
 
-// ---- Candidate information (managers / support) ------------------------------
-router.get('/candidates', authorize('support', 'admin', 'facilitator'), (req, res) => {
-  const scope = rules.scopeSql(getDb(), req.user);
-  const rows = getDb().prepare(`
+// ---- Candidate information (support/admin: all; facilitators: their streams) ----
+router.get('/candidates', authorize('support', 'admin', 'facilitator'), async (req, res) => {
+  const db = getDb();
+  const scope = await rules.scopeSql(db, req.user);
+  const rows = await db.all(`
     SELECT u.id, u.full_name, u.email, u.gender, u.avatar_config, u.accessibility, cp.cohort, cp.stream, cp.mentor, cp.supervisor,
       (SELECT COUNT(*) FROM requests r WHERE r.candidate_id = u.id AND r.status NOT IN ('Resolved','Closed')) AS open_requests
     FROM users u LEFT JOIN candidate_profiles cp ON cp.user_id = u.id
     WHERE u.role = 'candidate' AND u.is_active = 1 AND ${scope.sql} ORDER BY u.full_name
-  `).all(...scope.params);
+  `, scope.params);
   res.json({ candidates: rows.map(({ avatar_config, accessibility, ...r }) => ({ ...r, avatar: avatarOf({ avatar_config, gender: r.gender }), accessibility: JSON.parse(accessibility || '{}') })) });
 });
 
@@ -58,9 +59,9 @@ router.get(
   '/candidates/:id',
   authorize('support', 'admin', 'facilitator'),
   validate({ id: { type: 'int', required: true, min: 1 } }, 'params'),
-  (req, res) => {
-    rules.assertCanSeeCandidate(getDb(), req.user, req.params.id);
-    res.json({ profile: svc.getProfile(getDb(), req.params.id) });
+  async (req, res) => {
+    await rules.assertCanSeeCandidate(getDb(), req.user, req.params.id);
+    res.json({ profile: await svc.getProfile(getDb(), req.params.id) });
   }
 );
 
@@ -78,7 +79,7 @@ router.patch(
     techChamp: { type: 'string', max: 120 },
     supervisor: { type: 'string', max: 120 },
   }),
-  (req, res) => res.json({ profile: svc.updateCandidateProfile(getDb(), req.params.id, req.body, req.user) })
+  async (req, res) => res.json({ profile: await svc.updateCandidateProfile(getDb(), req.params.id, req.body, req.user) })
 );
 
 module.exports = router;

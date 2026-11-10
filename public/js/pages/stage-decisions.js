@@ -24,9 +24,10 @@ async function loadCandidates() {
   ({ candidates, stages } = await api('/stages/candidates'));
   const keep = Number(form.candidate.value) || focus;
   form.candidate.innerHTML = candidates.length
-    ? candidates.map((c) => `<option value="${c.id}">${esc(c.fullName)} · ${esc(t(c.stageLabel))}${c.readyForReview ? ` · ${t('ready for review')}` : ''}</option>`).join('')
+    ? candidates.map((c) => `<option value="${c.id}">${esc(c.fullName)} · ${esc(t(c.stageLabel))}${c.readyForReview || c.reviewRequested ? ` · ${t('ready for review')}` : ''}${c.overdue ? ` · ${t('past target')}` : ''}</option>`).join('')
     : `<option value="">${t('No candidates in your streams')}</option>`;
   if (keep && candidates.some((c) => c.id === keep)) form.candidate.value = String(keep);
+  renderInbox();
   await renderCandidate();
 }
 
@@ -100,6 +101,83 @@ form.addEventListener('submit', async (e) => {
   syncButton();
 });
 
+// ---- Approval inbox (batch) ------------------------------------------------------
+const inbox = document.getElementById('inbox');
+const inboxForm = document.getElementById('inbox-form');
+const approveBtn = document.getElementById('inbox-approve');
+function renderInbox() {
+  const ready = candidates.filter((c) => c.nextStage && (c.readyForReview || c.reviewRequested));
+  inbox.innerHTML = ready.length ? ready.map((c) => `
+    <li><label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3 transition hover:bg-white/[0.07] has-[:checked]:border-salmon/50 has-[:checked]:bg-salmon/[0.08]">
+      <input type="checkbox" value="${c.id}" class="mt-1 h-4 w-4 accent-salmon" data-inbox>
+      <span class="min-w-0 flex-1">
+        <span class="block font-medium">${esc(c.fullName)}</span>
+        <span class="mt-1 flex flex-wrap items-center gap-1 text-xs">${stageBadge(c.stage, c.stageLabel)}${icon('arrowRight', 'h-3 w-3 text-white/50')}${stageBadge(c.nextStage.key, c.nextStage.label)}
+          <span class="text-white/50">· ${t('{done} of {total} evidenced', { done: c.evidenceDone, total: c.evidenceTotal })}</span></span>
+        ${c.reviewRequested ? `<span class="mt-1 block text-xs text-salmon-50">${icon('flag', 'h-3 w-3 inline')} ${t('Candidate asked for a review')}${c.reviewNote ? `: <span translate="no">${esc(c.reviewNote)}</span>` : ''}</span>` : ''}
+        ${c.overdue ? `<span class="mt-1 block text-xs text-warn">${icon('clock', 'h-3 w-3 inline')} ${t('{days} days in stage (target {target})', { days: c.daysInStage, target: c.targetDays })}</span>` : ''}
+      </span>
+      <a href="/stage-decisions?candidate=${c.id}" class="text-xs font-semibold text-salmon-50 hover:underline" data-review-one>${t('Review')}</a>
+    </label></li>`).join('')
+    : `<li class="rounded-2xl border border-dashed border-white/15 p-6 text-center text-sm text-white/55 md:col-span-2">${t('Nobody is waiting for a review right now.')}</li>`;
+  syncInbox();
+}
+function syncInbox() {
+  const n = inbox.querySelectorAll('[data-inbox]:checked').length;
+  approveBtn.disabled = !n;
+  approveBtn.textContent = n ? t('Approve selected ({n})', { n }) : t('Approve selected');
+}
+inbox.addEventListener('change', syncInbox);
+document.getElementById('inbox-all').addEventListener('change', (e) => {
+  inbox.querySelectorAll('[data-inbox]').forEach((c) => { c.checked = e.target.checked; });
+  syncInbox();
+});
+inboxForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const candidateIds = [...inbox.querySelectorAll('[data-inbox]:checked')].map((c) => Number(c.value));
+  const reason = inboxForm.reason.value.trim();
+  if (!showFieldErrors(inboxForm, reason.length >= 3 ? {} : { reason: t('A shared note is required') })) return;
+  setBusy(approveBtn, true, 'Approving…');
+  try {
+    const out = await api('/stages/batch', { method: 'POST', body: { candidateIds, reason } });
+    toast(t('{ok} approved{failed}', { ok: out.approved, failed: out.failed ? `, ${out.failed} could not be approved` : '' }), out.failed ? 'error' : 'success');
+    for (const r of out.results.filter((x) => !x.ok)) toast(`${candidates.find((c) => c.id === r.candidateId)?.fullName || r.candidateId}: ${r.error}`, 'error');
+    inboxForm.reset();
+    document.getElementById('inbox-all').checked = false;
+    await Promise.all([loadCandidates(), loadTrail()]);
+  } catch (err) { toast(err.message, 'error'); showFieldErrors(inboxForm, err.details?.fields); }
+  setBusy(approveBtn, false);
+  syncInbox();
+});
+
+// ---- Placements --------------------------------------------------------------------
+async function loadPlacements() {
+  const { placements } = await api('/stages/placements');
+  const list = document.getElementById('pl-list');
+  list.innerHTML = placements.length ? placements.map((p) => `
+    <li class="flex flex-wrap items-center gap-3 rounded-2xl border ${p.status === 'pending' ? 'border-salmon/40 bg-salmon/[0.06]' : 'border-white/10 bg-white/[0.03]'} p-3">
+      <span class="min-w-0 flex-1"><span class="block font-medium">${esc(p.candidateName)} · ${esc(p.roleTitle)} at ${esc(p.company)}</span>
+        <span class="block text-xs text-white/55">${t('Reported by {name}', { name: esc(p.recruiterName || 'a recruiter') })} · ${fmtDate(p.createdAt)}${p.startDate ? ` · ${t('starts {date}', { date: fmtDate(p.startDate) })}` : ''} · ${t('current stage')}: ${esc(t(stages.find((s) => s.key === p.stage)?.label || p.stage))}</span>
+        ${p.note ? `<span class="block text-xs text-white/60" translate="no">${esc(p.note)}</span>` : ''}</span>
+      ${p.status === 'pending'
+        ? `<button class="btn btn-primary btn-sm" data-pl="${p.id}" data-approve="1">${t('Confirm placement')}</button><button class="btn btn-ghost btn-sm" data-pl="${p.id}" data-approve="0">${t('Not confirmed')}</button>`
+        : `<span class="badge ${p.status === 'confirmed' ? 'bg-ok/15 text-ok' : 'bg-white/10 text-white/60'}">${esc(t(p.status))}</span>`}
+    </li>`).join('') : `<li class="text-sm text-white/55">${t('No placements reported yet.')}</li>`;
+}
+document.getElementById('pl-list').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-pl]');
+  if (!b) return;
+  const approve = b.dataset.approve === '1';
+  const note = approve ? '' : prompt(t('Why is this placement not confirmed? (shared with the recruiter)')) || '';
+  if (!approve && !note.trim()) return;
+  b.disabled = true;
+  try {
+    await api(`/stages/placements/${b.dataset.pl}`, { method: 'POST', body: { approve, note: note.trim() || undefined } });
+    toast(approve ? t('Placement confirmed and stage updated') : t('Placement marked as not confirmed'), 'success');
+    await Promise.all([loadPlacements(), loadCandidates(), loadTrail()]);
+  } catch (err) { toast(err.message, 'error'); b.disabled = false; }
+});
+
 // ---- Audit trail --------------------------------------------------------------
 async function loadTrail() {
   ({ decisions } = await api('/stages/decisions', { query: { limit: 300 } }));
@@ -118,5 +196,6 @@ function renderTrail() {
 document.getElementById('trail-search').addEventListener('input', renderTrail);
 document.getElementById('trail-all').addEventListener('click', () => { focus = null; history.replaceState(null, '', location.pathname); renderTrail(); });
 
-await Promise.all([loadCandidates(), loadTrail()]);
-onLive('people', () => Promise.all([loadCandidates(), loadTrail()]));
+await Promise.all([loadCandidates(), loadTrail(), loadPlacements()]);
+onLive('people', () => Promise.all([loadCandidates(), loadTrail(), loadPlacements()]));
+if (location.hash === '#placements') setTimeout(() => document.getElementById('placements')?.scrollIntoView({ behavior: 'smooth' }), 400);

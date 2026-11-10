@@ -2,15 +2,13 @@
 /**
  * Ticket attachments. Files arrive as base64 data (no multipart dependency), are
  * checked by magic bytes (never by the client's claimed type), stored under random
- * names outside the web root, and only served to people who can see the request.
+ * names in the database (file_blobs, so they survive redeploys), and only served to
+ * people who can see the request.
  */
 const crypto = require('node:crypto');
-const fs = require('node:fs');
 const path = require('node:path');
-const { uploadDir } = require('../../config/env');
 const { badRequest, notFound } = require('../../utils/AppError');
 
-const DIR = path.join(uploadDir, 'attachments');
 const MAX_BYTES = 5 * 1024 * 1024;
 
 const TYPES = {
@@ -25,8 +23,8 @@ const TYPES = {
 };
 const ALIAS = { jpeg: 'jpg' };
 
-function canSee(db, requestId, user) {
-  const r = db.prepare('SELECT candidate_id FROM requests WHERE id = ?').get(requestId);
+async function canSee(db, requestId, user) {
+  const r = await db.one('SELECT candidate_id FROM requests WHERE id = ?', requestId);
   if (!r || (user.role === 'candidate' && r.candidate_id !== user.id)) throw notFound('Request not found');
 }
 
@@ -49,40 +47,43 @@ function decodeUpload({ name, data }, allowed = Object.keys(TYPES), describe = '
   return { base, ext, buf, mime: type.mime, inline: !!type.inline };
 }
 
-/** Write bytes under a random name (never the user's name) outside the web root. */
-function writeUpload(dir, ext, buf) {
-  fs.mkdirSync(dir, { recursive: true });
+/** Store bytes under a random name (never the user's name). */
+async function writeUpload(db, ext, buf) {
   const stored = `${crypto.randomBytes(16).toString('hex')}.${ext}`;
-  fs.writeFileSync(path.join(dir, stored), buf);
+  await db.run('INSERT INTO file_blobs (stored_name, data) VALUES (?, ?)', stored, buf);
   return stored;
 }
 
-function save(db, requestId, user, { name, data, isInternal }) {
-  canSee(db, requestId, user);
-  const { base, ext, buf, mime } = decodeUpload({ name, data });
-  const stored = writeUpload(DIR, ext, buf);
-  const type = { mime };
-  const { lastInsertRowid } = db.prepare(`
-    INSERT INTO attachments (request_id, uploader_id, stored_name, original_name, mime, size, is_internal) VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(requestId, user.id, stored, base, type.mime, buf.length, user.role !== 'candidate' && isInternal ? 1 : 0);
-  return Number(lastInsertRowid);
+async function readUpload(db, stored) {
+  const row = await db.one('SELECT data FROM file_blobs WHERE stored_name = ?', stored);
+  if (!row) throw notFound('File not found');
+  return Buffer.from(row.data);
 }
 
-function list(db, requestId, user) {
-  return db.prepare(`
+async function save(db, requestId, user, { name, data, isInternal }) {
+  await canSee(db, requestId, user);
+  const { base, ext, buf, mime } = decodeUpload({ name, data });
+  const stored = await writeUpload(db, ext, buf);
+  return db.insert(`
+    INSERT INTO attachments (request_id, uploader_id, stored_name, original_name, mime, size, is_internal) VALUES (?, ?, ?, ?, ?, ?, ?)
+  `, requestId, user.id, stored, base, mime, buf.length, user.role !== 'candidate' && isInternal ? 1 : 0);
+}
+
+async function list(db, requestId, user) {
+  return (await db.all(`
     SELECT a.id, a.original_name AS name, a.mime, a.size, a.is_internal, a.created_at, u.full_name AS uploader
     FROM attachments a JOIN users u ON u.id = a.uploader_id
     WHERE a.request_id = ? ${user.role === 'candidate' ? 'AND a.is_internal = 0' : ''}
     ORDER BY a.id
-  `).all(requestId).map((a) => ({ ...a, is_internal: !!a.is_internal }));
+  `, requestId)).map((a) => ({ ...a, is_internal: !!a.is_internal }));
 }
 
-function open(db, id, user) {
-  const a = db.prepare('SELECT * FROM attachments WHERE id = ?').get(id);
+async function open(db, id, user) {
+  const a = await db.one('SELECT * FROM attachments WHERE id = ?', id);
   if (!a || (a.is_internal && user.role === 'candidate')) throw notFound('Attachment not found');
-  canSee(db, a.request_id, user);
+  await canSee(db, a.request_id, user);
   const ext = a.stored_name.split('.').pop();
-  return { path: path.join(DIR, a.stored_name), name: a.original_name, mime: a.mime, inline: !!TYPES[ext]?.inline };
+  return { data: await readUpload(db, a.stored_name), name: a.original_name, mime: a.mime, inline: !!TYPES[ext]?.inline };
 }
 
-module.exports = { save, list, open, decodeUpload, writeUpload, TYPES, MAX_BYTES };
+module.exports = { save, list, open, decodeUpload, writeUpload, readUpload, TYPES, MAX_BYTES };

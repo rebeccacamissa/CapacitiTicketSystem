@@ -126,7 +126,78 @@ async function loadUpcoming() {
     </li>`).join('') : '<li class="text-sm text-white/50">No birthdays in the next two weeks.</li>';
 }
 
-const KIND_LABEL = { cv: 'CV files', project: 'Project files', certificate: 'Certificates' };
+// ---- What's next + candidate-requested stage review ----------------------------------
+async function loadNextStep() {
+  const el = document.getElementById('next-step');
+  if (!rm) return;
+  const { request } = await api('/stages/me/review');
+  const n = rm.whatsNext;
+  const st = rm.stage;
+  const progressNote = st.targetDays ? t('{days} days in this stage (expected about {target})', { days: st.daysInStage, target: st.targetDays }) : '';
+  el.innerHTML = `
+    <div class="flex items-center gap-2 text-xs font-semibold tracking-wider text-white/55 uppercase"><span class="text-salmon-50">${icon('compass', 'h-4 w-4')}</span><span id="next-title">${t("What's next")}</span></div>
+    ${rm.allComplete ? `<p class="mt-3 text-lg font-semibold">${t('You have completed the programme. Congratulations!')}</p>`
+      : n ? `<p class="mt-3 text-lg font-semibold">${esc(t(n.label))}</p>
+        ${n.tip ? `<p class="mt-1 text-sm text-white/70">${esc(t(n.tip))}</p>` : ''}
+        ${n.evidenceKind ? `<a href="/profile#portfolio-sharing" class="btn btn-ghost btn-sm mt-3">${icon('paperclip', 'h-4 w-4')}${t('Upload evidence')}</a>` : ''}`
+      : `<p class="mt-3 text-lg font-semibold">${t('Every exit criterion for {stage} is evidenced', { stage: esc(t(st.label)) })}</p>
+        <p class="mt-1 text-sm text-white/70">${t('Your facilitator can now review you for {next}.', { next: esc(t(st.next?.label || '')) })}</p>`}
+    ${progressNote ? `<p class="mt-3 text-xs ${st.overdue ? 'text-warn' : 'text-white/50'}">${st.overdue ? `${icon('clock', 'h-3.5 w-3.5 inline')} ` : ''}${progressNote}</p>` : ''}
+    ${rm.allComplete ? '' : `<div class="mt-4 border-t border-white/10 pt-4">
+      ${request
+        ? `<p class="flex items-center gap-2 text-sm text-ok">${icon('checkCircle', 'h-4 w-4')}${t('Review requested {when}. Your facilitator has been notified.', { when: fmtRelative(request.createdAt) })}</p>`
+        : `<form id="review-form" class="flex flex-wrap items-end gap-2">
+            <div class="min-w-[12rem] flex-1"><label for="review-note" class="field-label">${t('Think you are ready for the next stage?')}</label>
+              <input id="review-note" name="note" maxlength="500" class="field" placeholder="${t('Optional note for your facilitator')}"></div>
+            <button class="btn btn-primary">${icon('flag', 'h-4 w-4')}${t('Request stage review')}</button>
+          </form>`}
+    </div>`}`;
+  document.getElementById('review-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+    try {
+      await api('/stages/me/review', { method: 'POST', body: { note: e.target.note.value.trim() || undefined } });
+      toast(t('Review requested. Your facilitator has been notified.'), 'success');
+      loadNextStep();
+    } catch (err) { toast(err.message, 'error'); btn.disabled = false; }
+  });
+}
+
+// ---- Interview invitations from recruiters -----------------------------------------
+const IV_BADGE = { pending: 'bg-warn/15 text-warn', accepted: 'bg-ok/15 text-ok', declined: 'bg-white/10 text-white/60', withdrawn: 'bg-white/10 text-white/50' };
+async function loadInterviews() {
+  const { interviews } = await api('/career/interviews');
+  const list = document.getElementById('iv-list');
+  list.innerHTML = interviews.length ? interviews.map((i) => `
+    <li class="rounded-2xl border ${i.status === 'pending' ? 'border-salmon/40 bg-salmon/[0.07]' : 'border-white/10 bg-white/[0.03]'} p-4">
+      <div class="flex flex-wrap items-start justify-between gap-2">
+        <div class="min-w-0"><p class="font-semibold">${esc(i.roleTitle)} · ${esc(i.company)}</p>
+          <p class="text-xs text-white/55">${t('From {name}', { name: esc(i.recruiterName) })} · ${esc(t(i.mode))}${i.proposedAt ? ` · ${esc(i.proposedAt.replace('T', ' '))}` : ''}</p></div>
+        <span class="badge ${IV_BADGE[i.status]}">${esc(t(i.status))}</span>
+      </div>
+      ${i.message ? `<p class="mt-2 text-sm text-white/75" translate="no">${esc(i.message)}</p>` : ''}
+      ${i.status === 'pending' ? `<form class="mt-3 flex flex-wrap items-end gap-2" data-iv="${i.id}">
+          <div class="min-w-[10rem] flex-1"><label class="sr-only" for="iv-note-${i.id}">${t('Note to the recruiter')}</label><input id="iv-note-${i.id}" name="note" maxlength="500" class="field !py-1.5 text-sm" placeholder="${t('Optional note to the recruiter')}"></div>
+          <button class="btn btn-primary btn-sm" data-accept="1">${t('Accept')}</button><button class="btn btn-ghost btn-sm" data-accept="0">${t('Decline')}</button>
+        </form>` : i.candidateNote ? `<p class="mt-2 text-xs text-white/50">${t('Your note')}: <span translate="no">${esc(i.candidateNote)}</span></p>` : ''}
+    </li>`).join('')
+    : `<li class="rounded-2xl border border-dashed border-white/15 p-6 text-center text-sm text-white/55">${t('No interview invitations yet. Share your portfolio so recruiters can find you.')}</li>`;
+}
+document.getElementById('iv-list').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-accept]');
+  if (!b) return;
+  e.preventDefault();
+  const form = b.closest('[data-iv]');
+  form.querySelectorAll('button').forEach((x) => { x.disabled = true; });
+  try {
+    await api(`/career/interviews/${form.dataset.iv}/respond`, { method: 'POST', body: { accept: b.dataset.accept === '1', note: form.note.value.trim() || undefined } });
+    toast(b.dataset.accept === '1' ? t('Interview accepted. The recruiter has been told.') : t('Invitation declined.'), 'success');
+    loadInterviews();
+  } catch (err) { toast(err.message, 'error'); form.querySelectorAll('button').forEach((x) => { x.disabled = false; }); }
+});
+
+const KIND_LABEL ={ cv: 'CV files', project: 'Project files', certificate: 'Certificates' };
 async function loadPortfolioCards() {
   const [{ portfolio }, { files }] = await Promise.all([api('/recruiter/me'), api('/portfolio/files')]);
   const st = rm?.stage;
@@ -160,12 +231,14 @@ async function loadRoadmap() {
 }
 
 await loadRoadmap();
-await Promise.all([loadProfileAndHero(), loadStats(), loadRecent(), loadUpcoming(), loadFeed(), loadPortfolioCards()]);
+await Promise.all([loadProfileAndHero(), loadStats(), loadRecent(), loadUpcoming(), loadFeed(), loadPortfolioCards(), loadNextStep(), loadInterviews()]);
 if (location.hash === '#roadmap') document.getElementById('roadmap')?.scrollIntoView({ behavior: 'smooth' });
 
 // Live updates — no polling
-onLive('progress', async () => { await loadRoadmap(); loadProfileAndHero(); loadPortfolioCards(); toast('Your roadmap was just updated', 'success'); });
+onLive('progress', async () => { await loadRoadmap(); loadProfileAndHero(); loadPortfolioCards(); loadNextStep(); toast('Your roadmap was just updated', 'success'); });
 onLive('request', () => { loadStats(); loadRecent(); });
 onLive('xp', loadProfileAndHero);
 onLive('feed', loadFeed);
+onLive('interview', loadInterviews);
+if (location.hash === '#interviews') setTimeout(() => document.getElementById('interviews')?.scrollIntoView({ behavior: 'smooth' }), 500);
 document.addEventListener('cammy:avatar', loadProfileAndHero);

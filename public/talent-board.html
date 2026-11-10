@@ -13,10 +13,17 @@
 <body>
   <main id="main" class="opacity-0 space-y-6" data-title="Talent board" data-subtitle="Recruiter workspace">
     <section class="card">
-      <div class="grid gap-3 md:grid-cols-[1fr_14rem_14rem]">
-        <div><label for="talent-search" class="field-label">Search names, email, skills</label><input id="talent-search" class="field" type="search" placeholder="Search names, email, skills"></div>
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="sm:col-span-2"><label for="talent-search" class="field-label">Search names, email, headline</label><input id="talent-search" class="field" type="search" placeholder="Search names, email, headline"></div>
+        <div class="sm:col-span-2"><label for="skills-filter" class="field-label">Must have skills <span class="font-normal text-white/50">(comma-separated)</span></label><input id="skills-filter" class="field" list="skill-options" placeholder="e.g. Python, SQL"><datalist id="skill-options"></datalist></div>
         <div><label for="stream-filter" class="field-label">Stream</label><select id="stream-filter" class="field"><option value="">All streams</option></select></div>
+        <div><label for="cohort-filter" class="field-label">Cohort</label><select id="cohort-filter" class="field"><option value="">All cohorts</option></select></div>
         <div><label for="stage-filter" class="field-label">Stage</label><select id="stage-filter" class="field"><option value="">All stages</option></select></div>
+        <div><label for="docs-filter" class="field-label">Documents</label><select id="docs-filter" class="field"><option value="">Any</option><option value="cv">Has a CV</option><option value="certificate">Has a certificate</option><option value="any">Has any document</option></select></div>
+      </div>
+      <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+        <p id="talent-count" class="text-white/55" aria-live="polite"></p>
+        <label class="flex items-center gap-2">Sort by <select id="sort-filter" class="field !w-auto !py-1.5"><option value="name">Name</option><option value="stage">Furthest stage first</option></select></label>
       </div>
     </section>
     <section class="card overflow-hidden p-0" aria-label="Shared candidate portfolios">

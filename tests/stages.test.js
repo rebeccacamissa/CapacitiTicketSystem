@@ -10,8 +10,7 @@ const path = require('node:path');
 process.env.UPLOAD_DIR = path.join(os.tmpdir(), `capaciti-test-uploads-${process.pid}`);
 
 const { openDatabase, setDb } = require('../server/db/connection');
-const db = openDatabase(':memory:');
-setDb(db);
+let db;
 const { createApp } = require('../server/app');
 const bcrypt = require('bcryptjs');
 const { numbersNotInOriginal } = require('../server/modules/portfolio/cv-tailor.service');
@@ -33,22 +32,23 @@ async function call(who, method, url, body) {
 }
 
 const ids = {};
-function addUser(key, name, role, stream) {
-  ids[key] = Number(db.prepare('INSERT INTO users (full_name, email, password_hash, role) VALUES (?, ?, ?, ?)')
-    .run(name, `${key}@t.test`, bcrypt.hashSync('Passw0rd!', 4), role).lastInsertRowid);
-  if (role === 'candidate') db.prepare('INSERT INTO candidate_profiles (user_id, stream) VALUES (?, ?)').run(ids[key], stream);
+async function addUser(key, name, role, stream) {
+  ids[key] = await db.insert('INSERT INTO users (full_name, email, password_hash, role) VALUES (?, ?, ?, ?)', name, `${key}@t.test`, bcrypt.hashSync('Passw0rd!', 4), role);
+  if (role === 'candidate') await db.run('INSERT INTO candidate_profiles (user_id, stream) VALUES (?, ?)', ids[key], stream);
 }
-const stageOf = (id) => db.prepare('SELECT stage FROM candidate_stages WHERE candidate_id = ?').get(id)?.stage || 'enrolled';
+const stageOf = async (id) => (await db.one('SELECT stage FROM candidate_stages WHERE candidate_id = ?', id))?.stage || 'enrolled';
 
 before(async () => {
-  addUser('admin', 'Admin User', 'admin');
-  addUser('support', 'Support User', 'support');
-  addUser('fac', 'Facil User', 'facilitator');
-  addUser('rec', 'Recruiter One', 'recruiter');
-  addUser('rec2', 'Recruiter Two', 'recruiter');
-  addUser('dev', 'Dev Candidate', 'candidate', 'Software Development');
-  addUser('cloud', 'Cloud Candidate', 'candidate', 'Cloud Engineering');
-  db.prepare("INSERT INTO facilitator_streams (user_id, stream) VALUES (?, 'Software Development')").run(ids.fac);
+  db = await openDatabase({ memory: true });
+  setDb(db);
+  await addUser('admin', 'Admin User', 'admin');
+  await addUser('support', 'Support User', 'support');
+  await addUser('fac', 'Facil User', 'facilitator');
+  await addUser('rec', 'Recruiter One', 'recruiter');
+  await addUser('rec2', 'Recruiter Two', 'recruiter');
+  await addUser('dev', 'Dev Candidate', 'candidate', 'Software Development');
+  await addUser('cloud', 'Cloud Candidate', 'candidate', 'Cloud Engineering');
+  (await db.run("INSERT INTO facilitator_streams (user_id, stream) VALUES (?, 'Software Development')", ids.fac));
   server = createApp().listen(0);
   base = `http://127.0.0.1:${server.address().port}/api`;
   for (const k of Object.keys(ids)) await call(k, 'POST', '/auth/login', { email: `${k}@t.test`, password: 'Passw0rd!' });
@@ -79,7 +79,7 @@ test('forward decisions go one step at a time; same-stage decisions are blocked'
   const ok = await call('fac', 'POST', `/stages/candidates/${ids.dev}/decisions`, { toStage: 'training', reason: 'Onboarding evidence verified.' });
   assert.equal(ok.status, 201);
   assert.equal(ok.body.direction, 'forward');
-  assert.equal(stageOf(ids.dev), 'training');
+  assert.equal(await stageOf(ids.dev), 'training');
   const out = await call('fac', 'POST', `/stages/candidates/${ids.cloud}/decisions`, { toStage: 'training', reason: 'Not my stream' });
   assert.equal(out.status, 404);
 });
@@ -93,21 +93,21 @@ test('backward moves are admin-only and need a written reason', async () => {
   const ok = await call('admin', 'POST', `/stages/candidates/${ids.dev}/decisions`, { toStage: 'enrolled', reason: 'Contract was not signed; returning to Enrolled until it is.' });
   assert.equal(ok.status, 201);
   assert.equal(ok.body.direction, 'backward');
-  assert.equal(stageOf(ids.dev), 'enrolled');
+  assert.equal(await stageOf(ids.dev), 'enrolled');
 });
 
-test('the database itself rejects stage changes that bypass the rules', () => {
+test('the database itself rejects stage changes that bypass the rules', async () => {
   // A raw stage update with no matching decision.
-  assert.throws(() => db.prepare("UPDATE candidate_stages SET stage = 'placed' WHERE candidate_id = ?").run(ids.dev), /STAGE_AUDIT_REQUIRED/);
-  assert.throws(() => db.prepare("INSERT INTO candidate_stages (candidate_id, stage) VALUES (?, 'placed')").run(ids.cloud), /STAGE_AUDIT_REQUIRED/);
+  await assert.rejects(() => db.run("UPDATE candidate_stages SET stage = 'placed' WHERE candidate_id = ?", ids.dev), /STAGE_AUDIT_REQUIRED/);
+  await assert.rejects(() => db.run("INSERT INTO candidate_stages (candidate_id, stage) VALUES (?, 'placed')", ids.cloud), /STAGE_AUDIT_REQUIRED/);
   // A raw decision that skips a stage, comes from the wrong person, or moves back without an admin.
-  assert.throws(() => db.prepare("INSERT INTO stage_decisions (candidate_id, from_stage, to_stage, direction, decided_by, reason) VALUES (?, 'enrolled', 'placed', 'forward', ?, 'skip it')").run(ids.dev, ids.admin), /STAGE_SKIP/);
-  assert.throws(() => db.prepare("INSERT INTO stage_decisions (candidate_id, from_stage, to_stage, direction, decided_by, reason) VALUES (?, 'enrolled', 'training', 'forward', ?, 'not allowed')").run(ids.cloud, ids.fac), /STAGE_NOT_AUTHORISED/);
-  assert.throws(() => db.prepare("INSERT INTO stage_decisions (candidate_id, from_stage, to_stage, direction, decided_by, reason) VALUES (?, 'enrolled', 'training', 'forward', ?, 'support cannot')").run(ids.dev, ids.support), /STAGE_NOT_AUTHORISED/);
-  assert.throws(() => db.prepare("INSERT INTO stage_decisions (candidate_id, from_stage, to_stage, direction, decided_by, reason) VALUES (?, 'enrolled', 'enrolled', 'forward', ?, 'same stage')").run(ids.dev, ids.admin), /STAGE_UNCHANGED/);
+  await assert.rejects(() => db.run("INSERT INTO stage_decisions (candidate_id, from_stage, to_stage, direction, decided_by, reason) VALUES (?, 'enrolled', 'placed', 'forward', ?, 'skip it')", ids.dev, ids.admin), /STAGE_SKIP/);
+  await assert.rejects(() => db.run("INSERT INTO stage_decisions (candidate_id, from_stage, to_stage, direction, decided_by, reason) VALUES (?, 'enrolled', 'training', 'forward', ?, 'not allowed')", ids.cloud, ids.fac), /STAGE_NOT_AUTHORISED/);
+  await assert.rejects(() => db.run("INSERT INTO stage_decisions (candidate_id, from_stage, to_stage, direction, decided_by, reason) VALUES (?, 'enrolled', 'training', 'forward', ?, 'support cannot')", ids.dev, ids.support), /STAGE_NOT_AUTHORISED/);
+  await assert.rejects(() => db.run("INSERT INTO stage_decisions (candidate_id, from_stage, to_stage, direction, decided_by, reason) VALUES (?, 'enrolled', 'enrolled', 'forward', ?, 'same stage')", ids.dev, ids.admin), /STAGE_UNCHANGED/);
   // The trail is append-only.
-  assert.throws(() => db.prepare("UPDATE stage_decisions SET reason = 'edited'").run(), /AUDIT_LOG_IMMUTABLE/);
-  assert.throws(() => db.prepare('DELETE FROM stage_decisions').run(), /AUDIT_LOG_IMMUTABLE/);
+  await assert.rejects(() => db.run("UPDATE stage_decisions SET reason = 'edited'"), /AUDIT_LOG_IMMUTABLE/);
+  await assert.rejects(() => db.run('DELETE FROM stage_decisions'), /AUDIT_LOG_IMMUTABLE/);
 });
 
 test('stage audit trail: admin sees all, facilitator their streams, candidate their own', async () => {

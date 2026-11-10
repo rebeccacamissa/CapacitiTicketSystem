@@ -1,5 +1,5 @@
 Command: npm run demo:illegal
-Generated: 2026-11-09T21:06:58.372Z · Node v24.12.0 · win32
+Generated: 2026-11-10T05:54:08.141Z · Node v24.12.0 · win32
 
 
 Request REQ-2026-0001 is "Open". Raw SQL, no application code:
@@ -8,9 +8,17 @@ Request REQ-2026-0001 is "Open". Raw SQL, no application code:
   ✘ Open → Resolved (illegal jump): BLOCKED → ILLEGAL_TRANSITION: transition not permitted by workflow
   ✘ Open → Assigned (audited) but no assignee: BLOCKED → ASSIGNEE_REQUIRED: request must be assigned to a staff member
   ✘ Open → Assigned with assignee but NO audit row: BLOCKED → AUDIT_REQUIRED: status change has no matching audit_log entry
-  ✘ Tamper with audit_log: BLOCKED → AUDIT_LOG_IMMUTABLE: audit entries cannot be modified
-  ✘ Delete audit_log: BLOCKED → AUDIT_LOG_IMMUTABLE: audit entries cannot be deleted
+  ✘ Tamper with audit_log: BLOCKED → AUDIT_LOG_IMMUTABLE: audit_log entries cannot be modified or deleted
+  ✘ Delete audit_log: BLOCKED → AUDIT_LOG_IMMUTABLE: audit_log entries cannot be modified or deleted
 
 With audit row + assignee (legal path):
   ✔ Open → Assigned: accepted (status now "Assigned")
+
+Official programme stages (candidate is Enrolled):
+
+  ✘ Set stage to Placed with no decision: BLOCKED → STAGE_AUDIT_REQUIRED: stage change has no matching stage decision
+  ✘ Decision Enrolled → Placed (skips stages): BLOCKED → STAGE_SKIP: stages move forward one step at a time
+  ✘ Decision Enrolled → Enrolled (same stage): BLOCKED → STAGE_UNCHANGED: candidate is already at this stage
+  ✘ Support staff approve a stage: BLOCKED → STAGE_NOT_AUTHORISED: only an admin or the stream facilitator can approve this stage
+  ✔ Admin: Enrolled → In Training (legal): accepted (rolled back)
 

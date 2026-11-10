@@ -9,6 +9,7 @@
  *        rm.update(data)   // data = GET /api/progress/me shape
  */
 import { esc, fmtDate, statusBadge, t } from '../ui.js';
+import { icon } from '../icons.js';
 
 const CHECK = '<svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 import { renderAvatar } from './avatar.js';
@@ -22,7 +23,7 @@ const STATE_BADGE = {
   upcoming: 'bg-white/10 text-white/60',
 };
 
-export function createRoadmap(root, { editable = false, onToggleRequirement, heading = 'Your programme journey' } = {}) {
+export function createRoadmap(root, { editable = false, onToggleRequirement, onLinkEvidence, heading = 'Your programme journey' } = {}) {
   let data = null;
   let prevActive = null;
   let flyoutIndex = null;
@@ -68,6 +69,12 @@ export function createRoadmap(root, { editable = false, onToggleRequirement, hea
   });
   flyout.addEventListener('cancel', (e) => { e.preventDefault(); closeFlyout(); });
   flyout.addEventListener('change', async (e) => {
+    const sel = e.target.closest('select[data-evidence-for]');
+    if (sel && onLinkEvidence) {
+      sel.disabled = true;
+      try { await onLinkEvidence(Number(sel.dataset.evidenceFor), sel.value ? Number(sel.value) : null); } finally { sel.disabled = false; }
+      return;
+    }
     const box = e.target.closest('input[data-req-id]');
     if (!box || !onToggleRequirement) return;
     box.disabled = true;
@@ -101,16 +108,26 @@ export function createRoadmap(root, { editable = false, onToggleRequirement, hea
     const isCurrent = m.state === 'current';
     const blockers = isCurrent ? data.blockers : [];
 
+    const evidenceLink = (r) => (r.evidence
+      ? `<a href="/api/portfolio/files/${r.evidence.id}" target="_blank" rel="noopener" class="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-salmon-50 hover:underline">${icon('paperclip', 'h-3 w-3')}${esc(r.evidence.title)}</a>` : '');
+    const files = data.files || [];
     const reqItem = (r) => editable
-      ? `<li><label class="flex cursor-pointer items-start gap-3 rounded-lg p-2 transition hover:bg-white/5">
+      ? `<li class="rounded-lg p-2 transition hover:bg-white/5"><label class="flex cursor-pointer items-start gap-3">
            <input type="checkbox" data-req-id="${r.id}" ${r.completed ? 'checked' : ''} class="mt-0.5 h-4 w-4 accent-purple">
            <span class="flex-1 text-sm">${esc(r.label)}
              ${r.completed ? `<span class="block text-xs text-white/60">${fmtDate(r.completedAt)}${r.verifiedBy ? ` · verified by ${esc(r.verifiedBy)}` : ''}</span>` : ''}
-           </span></label></li>`
+           </span></label>
+           ${r.completed ? `<div class="mt-1 ml-7">${evidenceLink(r)}
+             ${files.length ? `<label class="sr-only" for="ev-${r.id}">${t('Evidence document for {item}', { item: esc(r.label) })}</label>
+               <select id="ev-${r.id}" data-evidence-for="${r.id}" class="field mt-1 !py-1 !text-xs">
+                 <option value="">${t('No linked document')}</option>
+                 ${files.map((f) => `<option value="${f.id}" ${r.evidence?.id === f.id ? 'selected' : ''}>${esc(f.title)} (${esc(f.kind)})</option>`).join('')}
+               </select>` : `<p class="text-xs text-white/45">${t('The candidate has not uploaded any documents yet.')}</p>`}</div>` : ''}
+         </li>`
       : r.completed
         ? `<li class="flex items-start gap-3 py-2">
              <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple text-white">${CHECK.replace('h-6 w-6', 'h-3 w-3')}</span>
-             <span class="flex-1 text-sm">${esc(r.label)}<span class="block text-xs text-white/60">${t('Completed {date}', { date: fmtDate(r.completedAt) })}</span></span></li>`
+             <span class="flex-1 text-sm">${esc(r.label)}<span class="block text-xs text-white/60">${t('Completed {date}', { date: fmtDate(r.completedAt) })}</span>${evidenceLink(r)}</span></li>`
         : `<li class="flex items-start gap-3 py-2">
              <span class="mt-0.5 h-5 w-5 shrink-0 rounded-full border-2 border-dashed border-white/25"></span>
              <span class="text-sm text-white/60">${esc(r.label)}</span></li>`;

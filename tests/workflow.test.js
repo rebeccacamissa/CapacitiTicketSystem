@@ -7,8 +7,7 @@ const assert = require('node:assert/strict');
 const { openDatabase, setDb } = require('../server/db/connection');
 const { validateTransition } = require('../server/modules/workflow/stateMachine');
 
-const db = openDatabase(':memory:');
-setDb(db);
+let db;
 const { createApp } = require('../server/app');
 
 let server, base;
@@ -27,15 +26,16 @@ async function call(who, method, path, body) {
 }
 
 const bcrypt = require('bcryptjs');
-function addUser(name, email, role) {
-  return Number(db.prepare('INSERT INTO users (full_name, email, password_hash, role) VALUES (?, ?, ?, ?)')
-    .run(name, email, bcrypt.hashSync('Passw0rd!', 4), role).lastInsertRowid);
+async function addUser(name, email, role) {
+  return db.insert('INSERT INTO users (full_name, email, password_hash, role) VALUES (?, ?, ?, ?)', name, email, bcrypt.hashSync('Passw0rd!', 4), role);
 }
 
 let ids = {};
 before(async () => {
-  ids.admin = addUser('Admin', 'admin@t.test', 'admin');
-  ids.support = addUser('Support', 'support@t.test', 'support');
+  db = await openDatabase({ memory: true });
+  setDb(db);
+  ids.admin = await addUser('Admin', 'admin@t.test', 'admin');
+  ids.support = await addUser('Support', 'support@t.test', 'support');
   server = createApp().listen(0);
   base = `http://127.0.0.1:${server.address().port}/api`;
   await call('admin', 'POST', '/auth/login', { email: 'admin@t.test', password: 'Passw0rd!' });
@@ -62,7 +62,7 @@ test('registration always creates a candidate and rejects weak passwords', async
 
 let reqId;
 test('candidate creates request with REQ-YYYY-NNNN reference', async () => {
-  const cat = db.prepare("SELECT id FROM categories WHERE name = 'Connectivity'").get().id;
+  const cat = (await db.one("SELECT id FROM categories WHERE name = 'Connectivity'")).id;
   const r = await call('cand', 'POST', '/requests', { title: 'No internet at home', description: 'Router is broken since Monday', categoryId: cat, priority: 'High' });
   assert.equal(r.status, 201);
   assert.match(r.body.request.reference, new RegExp(`^REQ-${new Date().getUTCFullYear()}-\\d{4}$`));
@@ -79,7 +79,7 @@ test('illegal transition Open → Closed is rejected with 409', async () => {
   const r = await call('support', 'POST', `/workflow/requests/${reqId}/transition`, { toStatus: 'Closed' });
   assert.equal(r.status, 409);
   assert.equal(r.body.error.code, 'ILLEGAL_STATUS_TRANSITION');
-  assert.equal(db.prepare('SELECT status FROM requests WHERE id = ?').get(reqId).status, 'Open');
+  assert.equal((await db.one('SELECT status FROM requests WHERE id = ?', reqId)).status, 'Open');
 });
 
 test('DB probe proves the trigger blocks illegal transitions independently', async () => {
@@ -109,7 +109,7 @@ test('full workflow with audit trail + candidate auto-transition on reply', asyn
   assert.equal((await call('support', 'POST', `/workflow/requests/${reqId}/transition`, { toStatus: 'Resolved', resolution: 'Router replaced' })).status, 200);
   assert.equal((await call('cand', 'POST', `/workflow/requests/${reqId}/transition`, { toStatus: 'Closed' })).status, 200);
 
-  const statusRows = db.prepare("SELECT old_status, new_status FROM audit_log WHERE request_id = ? AND action = 'STATUS_CHANGE' ORDER BY id").all(reqId);
+  const statusRows = (await db.all("SELECT old_status, new_status FROM audit_log WHERE request_id = ? AND action = 'STATUS_CHANGE' ORDER BY id", reqId));
   assert.deepEqual(statusRows.map((r) => `${r.old_status}>${r.new_status}`), [
     'Open>Assigned', 'Assigned>In Progress', 'In Progress>Waiting for Candidate',
     'Waiting for Candidate>In Progress', 'In Progress>Resolved', 'Resolved>Closed',
@@ -121,24 +121,24 @@ test('full workflow with audit trail + candidate auto-transition on reply', asyn
 });
 
 test('admin override is allowed, audited, and one-shot', async () => {
-  const cat = db.prepare('SELECT id FROM categories LIMIT 1').get().id;
+  const cat = (await db.one('SELECT id FROM categories LIMIT 1')).id;
   const { body } = await call('cand', 'POST', '/requests', { title: 'Override me', description: 'Testing override path', categoryId: cat });
   const id = body.request.id;
   assert.equal((await call('support', 'POST', `/workflow/requests/${id}/transition`, { toStatus: 'Closed', override: true })).status, 403);
   const r = await call('admin', 'POST', `/workflow/requests/${id}/transition`, { toStatus: 'Closed', override: true });
   assert.equal(r.status, 200);
-  assert.equal(db.prepare('SELECT is_override FROM audit_log WHERE request_id = ? ORDER BY id DESC').get(id).is_override, 1);
-  assert.equal(db.prepare('SELECT COUNT(*) n FROM transition_overrides').get().n, 0);
+  assert.equal((await db.one('SELECT is_override FROM audit_log WHERE request_id = ? ORDER BY id DESC', id)).is_override, 1);
+  assert.equal((await db.one('SELECT COUNT(*) n FROM transition_overrides')).n, 0);
 });
 
-test('audit log is immutable', () => {
-  assert.throws(() => db.prepare('DELETE FROM audit_log').run(), /AUDIT_LOG_IMMUTABLE/);
-  assert.throws(() => db.prepare("UPDATE audit_log SET details = 'x'").run(), /AUDIT_LOG_IMMUTABLE/);
+test('audit log is immutable', async () => {
+  await assert.rejects(() => db.run('DELETE FROM audit_log'), /AUDIT_LOG_IMMUTABLE/);
+  await assert.rejects(() => db.run("UPDATE audit_log SET details = 'x'"), /AUDIT_LOG_IMMUTABLE/);
 });
 
 test('verified evidence marks a stage ready for review but never moves the official stage', async () => {
-  const cand = db.prepare("SELECT id FROM users WHERE email = 'c1@t.test'").get().id;
-  const reqs = db.prepare("SELECT mr.id FROM milestone_requirements mr JOIN milestones m ON m.id = mr.milestone_id WHERE m.key = 'enrolled'").all();
+  const cand = (await db.one("SELECT id FROM users WHERE email = 'c1@t.test'")).id;
+  const reqs = (await db.all("SELECT mr.id FROM milestone_requirements mr JOIN milestones m ON m.id = mr.milestone_id WHERE m.key = 'enrolled'"));
   let last;
   for (const r of reqs) last = await call('support', 'PUT', `/progress/${cand}/requirements/${r.id}`, { completed: true });
   assert.equal(last.status, 200);
@@ -176,12 +176,12 @@ test('admin creates staff with a temporary password that must be changed', async
 
   // Never-used account can be removed; one with history cannot
   assert.equal((await call('admin', 'DELETE', `/admin/users/${r.body.id}`)).status, 204);
-  const cand = db.prepare("SELECT id FROM users WHERE email = 'c1@t.test'").get().id;
+  const cand = (await db.one("SELECT id FROM users WHERE email = 'c1@t.test'")).id;
   assert.equal((await call('admin', 'DELETE', `/admin/users/${cand}`)).body.error.code, 'USER_HAS_HISTORY');
 });
 
 test('support can update candidate programme details; candidates cannot', async () => {
-  const cand = db.prepare("SELECT id FROM users WHERE email = 'c2@t.test'").get().id;
+  const cand = (await db.one("SELECT id FROM users WHERE email = 'c2@t.test'")).id;
   const r = await call('support', 'PATCH', `/candidates/${cand}`, { mentor: 'Jane Mentor', techChamp: 'Kyle', stream: 'Cybersecurity' });
   assert.equal(r.status, 200);
   assert.equal(r.body.profile.candidate.mentor, 'Jane Mentor');
@@ -219,7 +219,7 @@ test('new users get a plain gender-based avatar; designs are validated and locke
 });
 
 test('candidate rates a resolved request; attachments are type-checked and access controlled', async () => {
-  const closedId = db.prepare("SELECT id FROM requests WHERE status = 'Closed' AND candidate_id = (SELECT id FROM users WHERE email = 'c1@t.test')").get().id;
+  const closedId = (await db.one("SELECT id FROM requests WHERE status = 'Closed' AND candidate_id = (SELECT id FROM users WHERE email = 'c1@t.test')")).id;
   const r = await call('cand', 'POST', `/requests/${closedId}/rating`, { rating: 5, comment: 'Great help' });
   assert.equal(r.status, 200);
   assert.ok(r.body.badges.some((b) => b.key === 'feedback'));
@@ -248,7 +248,8 @@ test('cohort feed: staff announce, everyone reacts; search is scoped', async () 
   assert.equal(feed.body.posts.find((x) => x.id === p.body.id).reactions.cheer.count, 1);
 
   const s1 = await call('cand2', 'GET', '/search?q=REQ');
-  assert.ok(s1.body.requests.every((r) => db.prepare('SELECT candidate_id FROM requests WHERE id = ?').get(r.id).candidate_id === db.prepare("SELECT id FROM users WHERE email = 'c2@t.test'").get().id));
+  const c2id = (await db.one("SELECT id FROM users WHERE email = 'c2@t.test'")).id;
+  for (const r of s1.body.requests) assert.equal((await db.one('SELECT candidate_id FROM requests WHERE id = ?', r.id)).candidate_id, c2id);
   assert.deepEqual(s1.body.candidates, []);
   assert.ok((await call('support', 'GET', '/search?q=Cand')).body.candidates.length >= 1);
 });
@@ -267,7 +268,7 @@ test('accessibility needs are private to the candidate and staff', async () => {
   assert.equal(bad.status, 400);
   const ok = await call('cand', 'PUT', '/profile/accessibility', { needs: ['sasl_interpreter', 'extra_time'], notes: 'Prefer morning sessions' });
   assert.equal(ok.status, 200);
-  const reqId = db.prepare("SELECT id FROM requests WHERE candidate_id = (SELECT id FROM users WHERE email = 'c1@t.test') LIMIT 1").get().id;
+  const reqId = (await db.one("SELECT id FROM requests WHERE candidate_id = (SELECT id FROM users WHERE email = 'c1@t.test') LIMIT 1")).id;
   const staffView = await call('support', 'GET', `/requests/${reqId}`);
   assert.deepEqual(staffView.body.request.candidate_accessibility.needs, ['sasl_interpreter', 'extra_time']);
   const ownView = await call('cand', 'GET', `/requests/${reqId}`);

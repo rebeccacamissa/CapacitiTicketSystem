@@ -7,12 +7,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { DatabaseSync } = require('node:sqlite');
 const bcrypt = require('bcryptjs');
 const { openDatabase, setDb } = require('../server/db/connection');
 
-const db = openDatabase(':memory:');
-setDb(db);
+let db;
 const { createApp } = require('../server/app');
 let server, base;
 const cookies = {};
@@ -33,24 +31,23 @@ async function call(who, method, path, body) {
   return { status: response.status, body: text ? JSON.parse(text) : null };
 }
 
-function addUser(name, email, role) {
-  return Number(db.prepare('INSERT INTO users (full_name, email, password_hash, role) VALUES (?, ?, ?, ?)')
-    .run(name, email, bcrypt.hashSync('Passw0rd!', 4), role).lastInsertRowid);
+async function addUser(name, email, role) {
+  return db.insert('INSERT INTO users (full_name, email, password_hash, role) VALUES (?, ?, ?, ?)', name, email, bcrypt.hashSync('Passw0rd!', 4), role);
 }
 
 before(async () => {
-  ids.recruiter = addUser('Recruiter User', 'recruiter@test.example', 'recruiter');
-  ids.candidate = addUser('Candidate User', 'candidate@test.example', 'candidate');
-  ids.support = addUser('Support User', 'support@test.example', 'support');
-  db.prepare('INSERT INTO candidate_profiles (user_id, stream, cohort) VALUES (?, ?, ?)')
-    .run(ids.candidate, 'Software Development', 'Test cohort');
-  const requirement = db.prepare(`
+  db = await openDatabase({ memory: true });
+  setDb(db);
+  ids.recruiter = await addUser('Recruiter User', 'recruiter@test.example', 'recruiter');
+  ids.candidate = await addUser('Candidate User', 'candidate@test.example', 'candidate');
+  ids.support = await addUser('Support User', 'support@test.example', 'support');
+  (await db.run('INSERT INTO candidate_profiles (user_id, stream, cohort) VALUES (?, ?, ?)', ids.candidate, 'Software Development', 'Test cohort'));
+  const requirement = (await db.one(`
     SELECT mr.id FROM milestone_requirements mr
     JOIN milestones m ON m.id = mr.milestone_id
     ORDER BY m.sort_order, mr.sort_order LIMIT 1
-  `).get();
-  db.prepare('INSERT INTO candidate_requirement_progress (candidate_id, requirement_id, verified_by) VALUES (?, ?, ?)')
-    .run(ids.candidate, requirement.id, ids.support);
+  `));
+  (await db.run('INSERT INTO candidate_requirement_progress (candidate_id, requirement_id, verified_by) VALUES (?, ?, ?)', ids.candidate, requirement.id, ids.support));
 
   server = createApp().listen(0);
   base = `http://127.0.0.1:${server.address().port}/api`;
@@ -65,43 +62,6 @@ before(async () => {
 });
 
 after(() => server.close());
-
-test('existing database user roles migrate without breaking candidate references', () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'capaciti-role-migration-'));
-  const dbPath = path.join(directory, 'legacy.db');
-  const legacy = new DatabaseSync(dbPath);
-  legacy.exec(`
-    PRAGMA foreign_keys = ON;
-    CREATE TABLE users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT, full_name TEXT NOT NULL, email TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'candidate'
-        CHECK (role IN ('candidate', 'support', 'admin')),
-      is_active INTEGER NOT NULL DEFAULT 1, first_name TEXT, surname TEXT, date_of_birth TEXT,
-      gender TEXT NOT NULL DEFAULT 'prefer-not', avatar_config TEXT, preferences TEXT NOT NULL DEFAULT '{}',
-      tour_done INTEGER NOT NULL DEFAULT 0, accessibility TEXT NOT NULL DEFAULT '{}',
-      language TEXT NOT NULL DEFAULT 'en', must_change_password INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-    );
-    CREATE TABLE candidate_profiles (user_id INTEGER PRIMARY KEY REFERENCES users(id), stream TEXT);
-    CREATE TRIGGER legacy_candidate_user_lookup AFTER INSERT ON candidate_profiles
-      BEGIN SELECT COUNT(*) FROM users; END;
-    INSERT INTO users (full_name, email, password_hash, role) VALUES ('Legacy Candidate', 'legacy@test.example', 'hash', 'candidate');
-    INSERT INTO candidate_profiles (user_id, stream) VALUES (1, 'Software Development');
-  `);
-  legacy.close();
-
-  const migrated = openDatabase(dbPath);
-  assert.equal(migrated.prepare("SELECT role FROM users WHERE email = 'legacy@test.example'").get().role, 'candidate');
-  assert.equal(migrated.prepare("SELECT stream FROM candidate_profiles WHERE user_id = 1").get().stream, 'Software Development');
-  assert.ok(migrated.prepare("SELECT 1 FROM sqlite_master WHERE type = 'trigger' AND name = 'legacy_candidate_user_lookup'").get());
-  migrated.prepare(`
-    INSERT INTO users (full_name, email, password_hash, role)
-    VALUES ('New Recruiter', 'new-recruiter@test.example', 'hash', 'recruiter')
-  `).run();
-  assert.deepEqual(migrated.prepare('PRAGMA foreign_key_check').all(), []);
-  migrated.close();
-  fs.rmSync(directory, { recursive: true, force: true });
-});
 
 test('recruiters see only published profiles and cannot access ticket or candidate-management APIs', async () => {
   const summary = await call('recruiter', 'GET', '/recruiter/summary');

@@ -150,6 +150,35 @@ function editStreams(u) {
   });
 }
 
+// ---- POPIA deletion requests ----------------------------------------------------------
+async function loadPrivacy() {
+  const { requests } = await api('/privacy/requests');
+  const el = document.getElementById('privacy-list');
+  el.innerHTML = requests.length ? requests.map((r) => `
+    <li class="flex flex-wrap items-center gap-3 rounded-2xl border ${r.status === 'open' ? 'border-warn/40 bg-warn/[0.06]' : 'border-white/10 bg-white/[0.03]'} p-3">
+      <span class="min-w-0 flex-1"><span class="block font-medium">${esc(r.userName)} <span class="text-xs text-white/50">· ${esc(r.email)} · ${esc(ROLE_LABEL[r.role] || r.role)}</span></span>
+        <span class="block text-xs text-white/55">${t('Requested')} ${fmtShort(r.createdAt)}${r.reason ? ` · <span translate="no">${esc(r.reason)}</span>` : ''}</span>
+        ${r.status !== 'open' ? `<span class="block text-xs text-white/50">${esc(r.status)} ${r.handledBy ? `${t('by')} ${esc(r.handledBy)}` : ''}${r.handledNote ? ` · <span translate="no">${esc(r.handledNote)}</span>` : ''}</span>` : ''}</span>
+      ${r.status === 'open' ? `<button class="btn btn-sm border border-salmon/40 bg-salmon/10 text-salmon-50 hover:bg-salmon/25" data-priv="${r.id}" data-action="complete">${t('Delete (anonymise)')}</button>
+        <button class="btn btn-ghost btn-sm" data-priv="${r.id}" data-action="decline">${t('Decline')}</button>` : `<span class="badge ${r.status === 'completed' ? 'bg-ok/15 text-ok' : 'bg-white/10 text-white/60'}">${esc(r.status)}</span>`}
+    </li>`).join('') : `<li class="text-sm text-white/55">${t('No privacy requests.')}</li>`;
+}
+const fmtShort = (iso) => new Date(iso).toLocaleDateString();
+document.getElementById('privacy-list').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-priv]');
+  if (!b) return;
+  let note = '';
+  if (b.dataset.action === 'decline') {
+    note = prompt(t('Why is this request declined? The user will receive this reason.')) || '';
+    if (!note.trim()) return;
+  } else if (!confirm(t('Anonymise this account now? This cannot be undone.'))) return;
+  try {
+    await api(`/privacy/requests/${b.dataset.priv}`, { method: 'POST', body: { action: b.dataset.action, note: note.trim() || undefined } });
+    toast(b.dataset.action === 'complete' ? t('Account anonymised') : t('Request declined'), 'success');
+    loadPrivacy(); loadUsers();
+  } catch (err) { toast(err.message, 'error'); }
+});
+
 // ---- Programme pipeline (official stages) ------------------------------------------
 async function loadPipeline() {
   const p = await api('/stages/pipeline');
@@ -287,6 +316,8 @@ probe.addEventListener('submit', async (e) => {
 loadKpis();
 loadUsers();
 loadPipeline();
+loadPrivacy();
+if (location.hash === "#privacy") setTimeout(() => document.getElementById("privacy")?.scrollIntoView({ behavior: "smooth" }), 400);
 onLive('people', loadPipeline);
 loadCats();
 onLive('people', loadUsers);

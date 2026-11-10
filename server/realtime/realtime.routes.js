@@ -6,7 +6,7 @@ const bus = require('./bus');
 const router = express.Router();
 
 /** GET /api/events — Server-Sent Events stream for live updates. */
-router.get('/', authenticate, (req, res) => {
+router.get('/', authenticate, async (req, res) => {
   res.set({
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache, no-transform',

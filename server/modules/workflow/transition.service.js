@@ -4,33 +4,33 @@
  * Owner: Member C
  *
  * Every status change runs as:
- *   BEGIN IMMEDIATE
- *     -> load + authorise
- *     -> application rule check (stateMachine.validateTransition)
+ *   BEGIN
+ *     -> load + lock the request row (SELECT … FOR UPDATE: concurrent changes serialise)
+ *     -> authorise + application rule check (stateMachine.validateTransition)
  *     -> [admin override token]
  *     -> INSERT audit_log (STATUS_CHANGE)
  *     -> UPDATE requests  (DB trigger re-validates + verifies audit row)
  *     -> [public message]
  *   COMMIT   (any failure => ROLLBACK, nothing persists)
  */
-const { transaction } = require('../../db/connection');
 const { AppError, notFound, forbidden, badRequest, conflict } = require('../../utils/AppError');
 const { validateTransition, PRIORITIES } = require('./stateMachine');
 const { writeAudit } = require('./audit.service');
+const email = require('../../services/email');
 
-function loadRequest(db, requestId, actor) {
-  const req = db.prepare('SELECT * FROM requests WHERE id = ?').get(requestId);
+async function loadRequest(db, requestId, actor, { lock = false } = {}) {
+  const req = await db.one(`SELECT * FROM requests WHERE id = ?${lock ? ' FOR UPDATE' : ''}`, requestId);
   // Candidates get 404 (not 403) for other people's requests — don't leak existence.
   if (!req || (actor.role === 'candidate' && req.candidate_id !== actor.id)) throw notFound('Request not found');
   return req;
 }
 
-function getStaff(db, userId) {
-  return db.prepare("SELECT id, full_name FROM users WHERE id = ? AND role IN ('support','admin') AND is_active = 1").get(userId);
+async function getStaff(db, userId) {
+  return db.one("SELECT id, full_name FROM users WHERE id = ? AND role IN ('support','admin') AND is_active = 1", userId);
 }
 
 /** Core: apply one status transition. Must be called inside a transaction. */
-function applyTransition(db, req, { toStatus, actor, note, message, resolution, assigneeId, override }) {
+async function applyTransition(db, req, { toStatus, actor, note, message, resolution, assigneeId, override }) {
   const check = validateTransition({ from: req.status, to: toStatus, role: actor.role, override });
   if (!check.ok) {
     throw conflict(check.code, check.message, {
@@ -40,7 +40,7 @@ function applyTransition(db, req, { toStatus, actor, note, message, resolution, 
 
   let newAssignee = req.assigned_to;
   if (assigneeId !== undefined && assigneeId !== null && actor.role !== 'candidate') {
-    if (!getStaff(db, assigneeId)) throw badRequest('Assignee must be an active support or admin user');
+    if (!await getStaff(db, assigneeId)) throw badRequest('Assignee must be an active support or admin user');
     newAssignee = assigneeId;
   }
   if (toStatus === 'Assigned' && !newAssignee) newAssignee = actor.id; // "assign to me"
@@ -50,17 +50,18 @@ function applyTransition(db, req, { toStatus, actor, note, message, resolution, 
   }
 
   if (newAssignee !== req.assigned_to) {
-    const staff = getStaff(db, newAssignee);
-    writeAudit(db, { requestId: req.id, userId: actor.id, action: 'ASSIGNMENT', details: `Assigned to ${staff.full_name}` });
+    const staff = await getStaff(db, newAssignee);
+    await writeAudit(db, { requestId: req.id, userId: actor.id, action: 'ASSIGNMENT', details: `Assigned to ${staff.full_name}` });
   }
 
   if (check.override) {
-    db.prepare('INSERT OR REPLACE INTO transition_overrides (request_id, to_status, authorized_by) VALUES (?, ?, ?)')
-      .run(req.id, toStatus, actor.id);
+    await db.run(`INSERT INTO transition_overrides (request_id, to_status, authorized_by) VALUES (?, ?, ?)
+      ON CONFLICT (request_id) DO UPDATE SET to_status = EXCLUDED.to_status, authorized_by = EXCLUDED.authorized_by, created_at = now_iso()`,
+    req.id, toStatus, actor.id);
   }
 
   // Audit row is written immediately BEFORE the update — the DB trigger requires it.
-  writeAudit(db, {
+  await writeAudit(db, {
     requestId: req.id, userId: actor.id, action: 'STATUS_CHANGE',
     oldStatus: req.status, newStatus: toStatus,
     internalNotes: actor.role === 'candidate' ? null : (note || null),
@@ -68,73 +69,90 @@ function applyTransition(db, req, { toStatus, actor, note, message, resolution, 
     isOverride: check.override,
   });
 
-  db.prepare(`
+  await db.run(`
     UPDATE requests SET
       status      = ?,
       assigned_to = ?,
-      resolution  = CASE WHEN ? IS NOT NULL THEN ? ELSE resolution END,
-      resolved_at = CASE WHEN ? = 'Resolved' THEN strftime('%Y-%m-%dT%H:%M:%fZ','now')
-                         WHEN ? = 'Reopened' THEN NULL ELSE resolved_at END,
-      closed_at   = CASE WHEN ? = 'Closed'   THEN strftime('%Y-%m-%dT%H:%M:%fZ','now')
-                         WHEN ? = 'Reopened' THEN NULL ELSE closed_at END,
-      updated_at  = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+      resolution  = COALESCE(?, resolution),
+      resolved_at = CASE WHEN ? = 'Resolved' THEN now_iso() WHEN ? = 'Reopened' THEN NULL ELSE resolved_at END,
+      closed_at   = CASE WHEN ? = 'Closed'   THEN now_iso() WHEN ? = 'Reopened' THEN NULL ELSE closed_at END,
+      updated_at  = now_iso()
     WHERE id = ?
-  `).run(toStatus, newAssignee, resolution || null, resolution || null,
-    toStatus, toStatus, toStatus, toStatus, req.id);
+  `, toStatus, newAssignee, resolution || null, toStatus, toStatus, toStatus, toStatus, req.id);
 
   if (message && message.trim()) {
-    db.prepare('INSERT INTO request_messages (request_id, author_id, body, is_internal) VALUES (?, ?, ?, 0)')
-      .run(req.id, actor.id, message.trim());
+    await db.run('INSERT INTO request_messages (request_id, author_id, body, is_internal) VALUES (?, ?, ?, 0)', req.id, actor.id, message.trim());
   }
 }
 
-function transitionStatus(db, requestId, opts) {
-  return transaction(db, () => {
-    const req = loadRequest(db, requestId, opts.actor);
-    if (opts.override && opts.actor.role !== 'admin') throw forbidden('Only administrators can override the workflow');
-    applyTransition(db, req, opts);
-    return db.prepare('SELECT * FROM requests WHERE id = ?').get(requestId);
+/** Email the other party about a status change or reply (never for internal notes). */
+async function notifyTicket(db, requestId, { actor, kind, text }) {
+  const r = await db.one(`SELECT r.id, r.reference, r.title, r.status, r.candidate_id, r.assigned_to,
+      c.email AS c_email, c.first_name AS c_first, a.email AS a_email
+    FROM requests r JOIN users c ON c.id = r.candidate_id LEFT JOIN users a ON a.id = r.assigned_to WHERE r.id = ?`, requestId);
+  if (!r) return;
+  const toCandidate = actor.id !== r.candidate_id;
+  const to = toCandidate ? r.c_email : r.a_email;
+  if (!to) return;
+  email.notify(db, {
+    to,
+    kind: `ticket_${kind}`,
+    subject: kind === 'reply' ? `New reply on ${r.reference}` : `${r.reference} is now ${r.status}`,
+    heading: kind === 'reply' ? `${actor.fullName} replied to ${r.reference}` : `${r.reference}: ${r.status}`,
+    lines: [r.title, ...(text ? [text.length > 500 ? `${text.slice(0, 500)}…` : text] : []),
+      ...(toCandidate && r.status === 'Waiting for Candidate' ? ['The support team is waiting for your reply.'] : [])],
+    cta: { label: 'Open the request', href: email.link(`/request?id=${r.id}`) },
   });
 }
 
+async function transitionStatus(db, requestId, opts) {
+  const out = await db.tx(async (t) => {
+    const req = await loadRequest(t, requestId, opts.actor, { lock: true });
+    if (opts.override && opts.actor.role !== 'admin') throw forbidden('Only administrators can override the workflow');
+    await applyTransition(t, req, opts);
+    return t.one('SELECT * FROM requests WHERE id = ?', requestId);
+  });
+  if (opts.notify !== false) await notifyTicket(db, requestId, { actor: opts.actor, kind: 'status', text: opts.message || (out.status === 'Resolved' ? out.resolution : '') });
+  return out;
+}
+
 /** Assign/reassign. If the request is Open/Reopened, assignment also moves it to "Assigned". */
-function assignRequest(db, requestId, { assigneeId, actor, note }) {
-  return transaction(db, () => {
-    const req = loadRequest(db, requestId, actor);
-    const staff = getStaff(db, assigneeId);
+async function assignRequest(db, requestId, { assigneeId, actor, note }) {
+  return db.tx(async (t) => {
+    const req = await loadRequest(t, requestId, actor, { lock: true });
+    const staff = await getStaff(t, assigneeId);
     if (!staff) throw badRequest('Assignee must be an active support or admin user');
 
     if (req.status === 'Open' || req.status === 'Reopened') {
-      applyTransition(db, req, { toStatus: 'Assigned', actor, note, assigneeId });
+      await applyTransition(t, req, { toStatus: 'Assigned', actor, note, assigneeId });
     } else if (['Resolved', 'Closed'].includes(req.status)) {
       throw conflict('REQUEST_FINALISED', `Cannot reassign a request that is ${req.status}. Reopen it first.`);
     } else {
       if (req.assigned_to === assigneeId) return req;
-      writeAudit(db, { requestId, userId: actor.id, action: 'ASSIGNMENT', details: `Reassigned to ${staff.full_name}`, internalNotes: note || null });
-      db.prepare("UPDATE requests SET assigned_to = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
-        .run(assigneeId, requestId);
+      await writeAudit(t, { requestId, userId: actor.id, action: 'ASSIGNMENT', details: `Reassigned to ${staff.full_name}`, internalNotes: note || null });
+      await t.run('UPDATE requests SET assigned_to = ?, updated_at = now_iso() WHERE id = ?', assigneeId, requestId);
     }
-    return db.prepare('SELECT * FROM requests WHERE id = ?').get(requestId);
+    return t.one('SELECT * FROM requests WHERE id = ?', requestId);
   });
 }
 
 /** Priority change recalculates the SLA due date from the original creation time. */
-function changePriority(db, requestId, { priority, actor, note }) {
+async function changePriority(db, requestId, { priority, actor, note }) {
   if (!PRIORITIES.includes(priority)) throw badRequest('Invalid priority');
-  return transaction(db, () => {
-    const req = loadRequest(db, requestId, actor);
+  return db.tx(async (t) => {
+    const req = await loadRequest(t, requestId, actor, { lock: true });
     if (req.priority === priority) return req;
-    writeAudit(db, {
+    await writeAudit(t, {
       requestId, userId: actor.id, action: 'PRIORITY_CHANGE',
       details: `Priority ${req.priority} → ${priority}`, internalNotes: note || null,
     });
-    db.prepare(`
+    await t.run(`
       UPDATE requests SET priority = ?,
-        due_at = strftime('%Y-%m-%dT%H:%M:%fZ', created_at, '+' || (SELECT hours FROM priority_sla WHERE priority = ?) || ' hours'),
-        updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+        due_at = iso_add(created_at, (SELECT hours FROM priority_sla WHERE priority = ?) || ' hours'),
+        updated_at = now_iso()
       WHERE id = ?
-    `).run(priority, priority, requestId);
-    return db.prepare('SELECT * FROM requests WHERE id = ?').get(requestId);
+    `, priority, priority, requestId);
+    return t.one('SELECT * FROM requests WHERE id = ?', requestId);
   });
 }
 
@@ -142,46 +160,54 @@ function changePriority(db, requestId, { priority, actor, note }) {
  * Candidate/staff reply. A candidate reply on a "Waiting for Candidate" request
  * automatically moves it back to "In Progress" — through the same pipeline.
  */
-function addMessage(db, requestId, { actor, body, isInternal }) {
-  return transaction(db, () => {
-    const req = loadRequest(db, requestId, actor);
-    const internal = actor.role !== 'candidate' && isInternal ? 1 : 0;
+async function addMessage(db, requestId, { actor, body, isInternal, notify = true }) {
+  const internal = actor.role !== 'candidate' && isInternal ? 1 : 0;
+  const out = await db.tx(async (t) => {
+    const req = await loadRequest(t, requestId, actor, { lock: true });
     if (req.status === 'Closed' && actor.role === 'candidate') {
       throw conflict('REQUEST_CLOSED', 'This request is closed. Reopen it to continue the conversation.');
     }
-    db.prepare('INSERT INTO request_messages (request_id, author_id, body, is_internal) VALUES (?, ?, ?, ?)')
-      .run(requestId, actor.id, body, internal);
+    await t.run('INSERT INTO request_messages (request_id, author_id, body, is_internal) VALUES (?, ?, ?, ?)', requestId, actor.id, body, internal);
 
     let autoTransitioned = false;
     if (actor.role === 'candidate' && req.status === 'Waiting for Candidate') {
-      applyTransition(db, req, { toStatus: 'In Progress', actor });
+      await applyTransition(t, req, { toStatus: 'In Progress', actor });
       autoTransitioned = true;
     } else {
-      db.prepare("UPDATE requests SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?").run(requestId);
+      await t.run('UPDATE requests SET updated_at = now_iso() WHERE id = ?', requestId);
     }
     return { autoTransitioned };
   });
+  if (!internal && notify) await notifyTicket(db, requestId, { actor, kind: 'reply', text: body });
+  return out;
 }
 
 /**
  * DIAGNOSTIC: bypasses the application validator entirely and issues raw SQL,
  * proving the database itself blocks illegal transitions. Always rolled back.
  */
-function dbProbe(db, requestId, { toStatus, actor, withAudit }) {
-  const req = db.prepare('SELECT * FROM requests WHERE id = ?').get(requestId);
+const ROLLBACK = Symbol('probe-rollback');
+async function dbProbe(db, requestId, { toStatus, actor, withAudit }) {
+  const req = await db.one('SELECT * FROM requests WHERE id = ?', requestId);
   if (!req) throw notFound('Request not found');
-  db.exec('BEGIN IMMEDIATE TRANSACTION;');
+  let result;
   try {
-    if (withAudit) {
-      writeAudit(db, { requestId, userId: actor.id, action: 'STATUS_CHANGE', oldStatus: req.status, newStatus: toStatus, details: 'db-probe' });
-    }
-    db.prepare('UPDATE requests SET status = ? WHERE id = ?').run(toStatus, requestId);
-    return { accepted: true, from: req.status, to: toStatus };
+    await db.tx(async (t) => {
+      try {
+        if (withAudit) {
+          await writeAudit(t, { requestId, userId: actor.id, action: 'STATUS_CHANGE', oldStatus: req.status, newStatus: toStatus, details: 'db-probe' });
+        }
+        await t.run('UPDATE requests SET status = ? WHERE id = ?', toStatus, requestId);
+        result = { accepted: true, from: req.status, to: toStatus };
+      } catch (err) {
+        result = { accepted: false, from: req.status, to: toStatus, dbError: err.message };
+      }
+      throw ROLLBACK; // probe never persists anything
+    });
   } catch (err) {
-    return { accepted: false, from: req.status, to: toStatus, sqliteError: err.message };
-  } finally {
-    db.exec('ROLLBACK;'); // probe never persists anything
+    if (err !== ROLLBACK) throw err;
   }
+  return result;
 }
 
 module.exports = { transitionStatus, assignRequest, changePriority, addMessage, dbProbe, loadRequest, AppError };
