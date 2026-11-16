@@ -2,7 +2,7 @@ import { api } from '../api.js';
 import { initPage, ROLE_LABEL } from '../layout.js';
 import { icon } from '../icons.js';
 import { onLive } from '../live.js';
-import { esc, toast, setBusy, avatarHtml, countUp, openModal, showFieldErrors, t } from '../ui.js';
+import { esc, toast, setBusy, avatarHtml, countUp, openModal, showFieldErrors, t, attachTeamLists } from '../ui.js';
 
 const me = await initPage({ roles: ['admin'] });
 const options = await api('/meta/options');
@@ -61,7 +61,7 @@ function renderUsers() {
         : u.role === 'facilitator'
           ? `${u.streams?.length ? u.streams.map((s) => `<span class="chip mr-1 mb-1 !text-[0.65rem]">${esc(s)}</span>`).join('') : '<span class="text-warn">No streams assigned</span>'}
              <button type="button" class="block text-xs font-semibold text-salmon-50 hover:underline" data-streams="${u.id}">Edit streams</button>`
-          : `${esc(u.position || '—')}<span class="block text-white/40">${esc(u.employee_id || 'No employee ID')} · ${u.active_assigned} active case(s)</span>`}</td>
+          : `${esc(u.position || '—')}<span class="block text-white/40">${u.employee_id ? esc(u.employee_id) : `<button type="button" class="font-semibold text-salmon-50 hover:underline" data-genid="${u.id}">Generate employee ID</button>`} · ${u.active_assigned} active case(s)</span>`}</td>
       <td><div class="flex flex-col items-start gap-1">${u.is_active ? '<span class="badge bg-ok/15 text-ok"><span class="h-1.5 w-1.5 rounded-full bg-ok"></span>Active</span>' : '<span class="badge bg-white/10 text-white/50">Deactivated</span>'}
         ${u.must_change_password ? `<span class="badge bg-warn/15 text-warn">${icon('key', 'h-3 w-3')}Temp password</span>` : ''}</div></td>
       <td class="text-right">${u.id === me.id ? '' : `<div class="flex justify-end gap-1.5">
@@ -100,6 +100,10 @@ table.addEventListener('click', async (e) => {
   const b = e.target.closest('button');
   if (!b) return;
   if (b.dataset.streams) return editStreams(users.find((x) => x.id === Number(b.dataset.streams)));
+  if (b.dataset.genid) {
+    try { const { employeeId } = await api(`/admin/users/${b.dataset.genid}/employee-id`, { method: 'POST' }); toast(`Employee ID ${employeeId} created`, 'success'); loadUsers(); } catch (err) { toast(err.message, 'error'); }
+    return;
+  }
   const id = Number(b.dataset.reset || b.dataset.active || b.dataset.remove);
   const u = users.find((x) => x.id === id);
   if (!u) return;
@@ -219,7 +223,7 @@ document.getElementById('add-user').addEventListener('click', () => {
         <div class="sm:col-span-2"><label class="field-label" for="nu-gender">Gender <span class="font-normal text-white/50">(sets their starting avatar)</span></label>
           <select id="nu-gender" name="gender" class="field"><option value="prefer-not">Prefer not to say</option><option value="female">Female</option><option value="male">Male</option><option value="non-binary">Non-binary</option></select></div>
         <div data-for="staff"><label class="field-label" for="nu-pos">Position</label><input id="nu-pos" name="position" list="positions" class="field"><datalist id="positions">${options.positions.map((p) => `<option value="${esc(p)}">`).join('')}</datalist></div>
-        <div data-for="staff"><label class="field-label" for="nu-emp">Employee ID</label><input id="nu-emp" name="employeeId" class="field" placeholder="CAP-0000"><p class="field-error" data-error-for="employeeId"></p></div>
+        <div data-for="staff"><label class="field-label" for="nu-emp">Employee ID</label><div class="flex gap-2"><input id="nu-emp" name="employeeId" class="field" placeholder="Generated automatically" aria-describedby="nu-emp-hint"><button type="button" class="btn btn-ghost btn-sm shrink-0" data-preview-id>Preview</button></div><p id="nu-emp-hint" class="mt-1 text-xs text-white/50">Leave blank to generate the next CAP-EMP-YYYY-NNNN number.</p><p class="field-error" data-error-for="employeeId"></p></div>
         <div data-for="candidate" hidden><label class="field-label" for="nu-cohort">Cohort</label><input id="nu-cohort" name="cohort" list="cohorts" class="field"><datalist id="cohorts">${options.cohorts.map((c) => `<option value="${esc(c)}">`).join('')}</datalist></div>
         <div data-for="candidate" hidden><label class="field-label" for="nu-stream">Stream</label><select id="nu-stream" name="stream" class="field"><option value="">—</option>${options.streams.map((s) => `<option>${esc(s)}</option>`).join('')}</select></div>
         <div data-for="candidate" hidden><label class="field-label" for="nu-mentor">Mentor</label><input id="nu-mentor" name="mentor" class="field"></div>
@@ -232,6 +236,10 @@ document.getElementById('add-user').addEventListener('click', () => {
     </form>`, { wide: true });
 
   const form = m.el.querySelector('form');
+  attachTeamLists(form, options);
+  form.querySelector('[data-preview-id]').addEventListener('click', async () => {
+    try { const { employeeId } = await api('/admin/employee-ids/next'); form.employeeId.placeholder = `Next: ${employeeId}`; } catch (err) { toast(err.message, 'error'); }
+  });
   const sync = () => {
     const staff = form.role.value !== 'candidate';
     form.querySelectorAll('[data-for="staff"]').forEach((el) => { el.hidden = !staff; });
@@ -250,7 +258,6 @@ document.getElementById('add-user').addEventListener('click', () => {
     if (!body.firstName) errs.firstName = 'Required';
     if (!body.surname) errs.surname = 'Required';
     if (!body.email) errs.email = 'Required';
-    if (role !== 'candidate' && !body.employeeId) errs.employeeId = 'Required for staff';
     if (!showFieldErrors(form, errs)) return;
     const btn = form.querySelector('button.btn-primary');
     setBusy(btn, true, 'Creating…');

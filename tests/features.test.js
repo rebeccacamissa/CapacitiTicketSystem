@@ -250,3 +250,36 @@ test('POPIA: export my data, request deletion, admin anonymises', async () => {
   assert.equal((await call('ben', 'GET', '/auth/me')).status, 401); // can no longer sign in
   assert.equal((await call('ann', 'GET', '/privacy/requests')).status, 403);
 });
+
+test('notifications are role-specific: candidates never get staff alerts', async () => {
+  await db.run("INSERT INTO feed_posts (kind, author_id, cohort, body) VALUES ('announcement', ?, NULL, 'Capstone check-ins on Thursday')", ids.admin);
+  const cand = (await call('ann2', 'GET', '/notifications')).body.items; // ann2 = Ann's fresh session
+  const types = new Set(cand.map((n) => n.type));
+  for (const staffOnly of ['queue', 'overdue', 'reply', 'review', 'placement', 'stuck', 'privacy', 'accessibility']) assert.equal(types.has(staffOnly), false, staffOnly);
+  assert.ok(types.has('announcement'));
+  const staff = (await call('admin', 'GET', '/notifications')).body.items;
+  assert.equal(staff.some((n) => n.type === 'announcement'), false);
+});
+
+test('accessibility needs are routed to the coach/facilitator and admins', async () => {
+  await db.run("UPDATE candidate_profiles SET supervisor = 'Fay Facil' WHERE user_id = ?", ids.cat);
+  await login('cat');
+  assert.equal((await call('cat', 'PUT', '/profile/accessibility', { needs: ['extra_time'], notes: 'Dyslexia' })).status, 200);
+  const sent = (await db.all("SELECT to_email FROM email_log WHERE kind = 'accessibility_needs'")).map((r) => r.to_email);
+  assert.ok(sent.includes('fac@t.test'));
+  assert.ok(sent.includes('admin@t.test') && sent.includes('admin2@t.test'));
+  assert.ok(!sent.includes('rec@t.test'));
+  const facNotes = (await call('fac', 'GET', '/notifications')).body.items;
+  assert.ok(facNotes.some((n) => n.type === 'accessibility'));
+  assert.equal((await call('rec', 'GET', '/candidates')).status, 403);
+});
+
+test('offline CAPACITI CV template works without AI and puts job-relevant skills first', async () => {
+  await call('ann2', 'PUT', '/career/cv', { cv: { fullName: 'Ann Candidate', skills: ['HTML', 'SQL', 'JavaScript'] } });
+  const pdf = await call('ann2', 'POST', '/career/cv/template', { jobTitle: 'Data Analyst', jobDescription: 'Strong SQL needed' }, { raw: true });
+  assert.equal(pdf.status, 200);
+  assert.equal(pdf.buf.subarray(0, 5).toString(), '%PDF-');
+  const saved = await call('ann2', 'POST', '/career/cv/template', { save: true });
+  assert.equal(saved.status, 201);
+  assert.match(saved.body.file.title, /CAPACITI CV/);
+});

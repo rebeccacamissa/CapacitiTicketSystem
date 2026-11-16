@@ -51,7 +51,7 @@ router.post(
     dateOfBirth: DOB_RULE,
     gender: { type: 'enum', values: ['female', 'male', 'non-binary', 'prefer-not'], default: 'prefer-not' },
     position: { type: 'string', max: 80 },
-    employeeId: { type: 'string', max: 20, pattern: /^[A-Za-z0-9-]+$/, patternMessage: 'Employee ID may contain letters, numbers and hyphens' },
+    employeeId: { type: 'string', max: 20, pattern: people.EMPLOYEE_ID_RE, patternMessage: 'Use CAP-EMP-YYYY-NNNN, or leave blank to generate one' },
     cohort: { type: 'string', max: 80 },
     stream: { type: 'string', max: 80 },
     mentor: { type: 'string', max: 120 },
@@ -60,15 +60,36 @@ router.post(
     streams: { type: 'array', of: 'string', max: 20, itemMax: 80 },
   }),
   async (req, res) => {
-    if (req.body.role !== 'candidate' && !req.body.employeeId) {
-      throw badRequest('Employee ID is required for staff accounts', { fields: { employeeId: 'Employee ID is required for staff' } });
-    }
     const tempPassword = people.generateTempPassword();
     const streams = Array.isArray(req.body.streams) ? req.body.streams.filter((x) => typeof x === 'string') : [];
     const id = await people.createUser(getDb(), { ...req.body, streams, password: tempPassword, mustChangePassword: true, createdBy: req.user.id });
     res.status(201).json({ id, tempPassword });
   }
 );
+
+/** Preview the next generated employee ID (the number is reserved only when a staff user is created). */
+router.get('/employee-ids/next', async (req, res) => {
+  const year = new Date().getUTCFullYear();
+  const row = await getDb().one('SELECT last_value FROM employee_id_counters WHERE year = ?', year);
+  let n = (row?.last_value || 0) + 1;
+  while (await getDb().one('SELECT 1 FROM staff_profiles WHERE employee_id = ?', `CAP-EMP-${year}-${String(n).padStart(4, '0')}`)) n += 1;
+  res.json({ employeeId: `CAP-EMP-${year}-${String(n).padStart(4, '0')}`, format: 'CAP-EMP-YYYY-NNNN' });
+});
+
+/** Generate an employee ID for an existing staff member who has none (never overwrites one). */
+router.post('/users/:id/employee-id', idParam, async (req, res) => {
+  const db = getDb();
+  const out = await db.tx(async (t) => {
+    const u = await t.one('SELECT u.role, sp.employee_id FROM users u LEFT JOIN staff_profiles sp ON sp.user_id = u.id WHERE u.id = ? FOR UPDATE OF u', req.params.id);
+    if (!u) throw notFound('User not found');
+    if (u.role === 'candidate') throw badRequest('Candidates do not have employee IDs');
+    if (u.employee_id) throw conflict('EMPLOYEE_ID_EXISTS', `This user already has employee ID ${u.employee_id}`);
+    const id = await people.nextEmployeeId(t);
+    await t.run('INSERT INTO staff_profiles (user_id, employee_id) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET employee_id = EXCLUDED.employee_id', req.params.id, id);
+    return id;
+  });
+  res.json({ employeeId: out });
+});
 
 /** Assign a facilitator to one or more streams (replaces the current list). */
 router.put('/users/:id/streams', idParam, async (req, res) => {
@@ -111,7 +132,11 @@ router.patch(
       if (req.body.role) {
         await t.run('UPDATE users SET role = ? WHERE id = ?', req.body.role, id);
         if (req.body.role === 'candidate') await t.run('INSERT INTO candidate_profiles (user_id, updated_by) VALUES (?, ?) ON CONFLICT DO NOTHING', id, req.user.id);
-        else await t.run('INSERT INTO staff_profiles (user_id) VALUES (?) ON CONFLICT DO NOTHING', id);
+        else {
+          await t.run('INSERT INTO staff_profiles (user_id) VALUES (?) ON CONFLICT DO NOTHING', id);
+          const sp = await t.one('SELECT employee_id FROM staff_profiles WHERE user_id = ?', id);
+          if (!sp.employee_id) await t.run('UPDATE staff_profiles SET employee_id = ? WHERE user_id = ?', await people.nextEmployeeId(t), id);
+        }
       }
       if (req.body.isActive !== undefined) (await t.run('UPDATE users SET is_active = ? WHERE id = ?', req.body.isActive ? 1 : 0, id));
     });

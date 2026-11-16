@@ -97,17 +97,20 @@ router.post(
 
 // ---- Demo role switcher (DEMO_MODE=true, never in production) -------------------
 const DEMO_EMAILS = {
-  candidate: 'lerato@example.com',
-  support: 'thabo@capaciti.org.za',
-  admin: 'admin@capaciti.org.za',
-  recruiter: 'recruiter@capaciti.org.za',
-  facilitator: 'facilitator@capaciti.org.za',
+  candidate: 'rebecca@capaciti.org.za',
+  facilitator: 'liyabona@capaciti.org.za',
+  support: 'bradley@capaciti.org.za',
+  admin: 'bianca@capaciti.org.za',
+  recruiter: 'ehrin@capaciti.org.za',
 };
 
 router.get('/demo-accounts', async (req, res) => {
   if (!demoMode) return res.json({ enabled: false, accounts: [] });
-  const rows = await getDb().all(`SELECT id, full_name, role, email FROM users WHERE email IN (${Object.values(DEMO_EMAILS).map(() => '?').join(',')}) AND is_active = 1`, Object.values(DEMO_EMAILS));
-  res.json({ enabled: true, accounts: rows.map((r) => ({ role: r.role, name: r.full_name })) });
+  const rows = await getDb().all(`SELECT u.full_name, u.role, sp.position, cp.stream FROM users u
+    LEFT JOIN staff_profiles sp ON sp.user_id = u.id LEFT JOIN candidate_profiles cp ON cp.user_id = u.id
+    WHERE u.email IN (${Object.values(DEMO_EMAILS).map(() => '?').join(',')}) AND u.is_active = 1`, Object.values(DEMO_EMAILS));
+  // The role each demo account previews is the key in DEMO_EMAILS; the title is their CAPACITI position.
+  res.json({ enabled: true, accounts: rows.map((r) => ({ role: r.role, name: r.full_name, title: r.position || (r.role === 'candidate' ? `Candidate${r.stream ? ` · ${r.stream}` : ''}` : '') })) });
 });
 
 router.post('/demo-login', validate({ role: { type: 'enum', required: true, values: Object.keys(DEMO_EMAILS) } }), async (req, res) => {

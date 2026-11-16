@@ -30,7 +30,7 @@ const NAV = {
   ],
   support: [
     ['Dashboard', [['/insights', 'Support dashboard', 'chart']]],
-    ['Work', [['/requests', 'Ticket queue', 'ticket'], ['/candidates', 'Candidates', 'users']]],
+    ['Work', [['/requests', 'Ticket queue', 'ticket'], ['/candidates', 'Candidates', 'users'], ['/stage-decisions', 'Stage approvals', 'flag']]],
     ['Community', [['/feed', 'Cohort feed', 'megaphone']]],
     ['Me', [['/profile', 'Profile & avatar', 'user']]],
   ],
@@ -230,7 +230,7 @@ function buildShell(user, demoMode) {
   if (main.dataset.easy) main.insertAdjacentHTML('afterbegin', `<div class="easy-summary card mb-6 !border-salmon/40" role="note"><p class="flex items-center gap-2 font-semibold">${icon('info', 'h-5 w-5 text-salmon-50')}${t('About this page')}</p><p class="mt-2 text-base leading-relaxed">${t(main.dataset.easy)}</p></div>`);
   translateDom(document);
 
-  wireShell(user);
+  wireShell(user, demoMode);
   loadNotifications();
   loadLevel();
   if (user.role !== 'recruiter') loadBirthdayBanner(user);
@@ -272,7 +272,7 @@ function buildShell(user, demoMode) {
   }
 }
 
-function wireShell(user) {
+function wireShell(user, demoMode) {
   const sidebar = document.getElementById('sidebar');
   const scrim = document.getElementById('drawer-scrim');
   const opener = document.getElementById('open-drawer');
@@ -291,6 +291,20 @@ function wireShell(user) {
     location.href = '/';
   }));
   document.querySelectorAll('[data-open-palette]').forEach((b) => b.addEventListener('click', togglePalette));
+
+  // Label the switcher with the real person behind each demo role (name + CAPACITI title).
+  if (demoMode) {
+    api('/auth/demo-accounts').then(({ accounts }) => {
+      for (const a of accounts) {
+        document.querySelectorAll(`[data-demo-role="${a.role}"]`).forEach((b) => {
+          const label = `${a.name} · ${a.title || ROLE_LABEL[a.role]}`;
+          b.title = label;
+          b.setAttribute('aria-label', `${t('Preview as')} ${label}`);
+          b.innerHTML = `${esc(a.name.split(' ')[0])}<span class="hidden 2xl:inline font-normal opacity-70"> · ${esc(ROLE_LABEL[a.role])}</span>`;
+        });
+      }
+    }).catch(() => {});
+  }
 
   document.querySelectorAll('[data-demo-role]').forEach((b) => b.addEventListener('click', async () => {
     if (b.dataset.demoRole === user.role) return;

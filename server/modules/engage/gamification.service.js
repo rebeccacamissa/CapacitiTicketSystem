@@ -9,15 +9,15 @@ const XP = { tour: 20, avatar: 20, request_created: 10, request_closed: 15, rati
 
 const BADGES = [
   { key: 'explorer', name: 'Explorer', description: 'Completed the guided walkthrough', icon: 'compass', roles: '*' },
-  { key: 'stylist', name: 'Stylist', description: 'Designed your own avatar', icon: 'sparkle', roles: '*' },
+  { key: 'stylist', name: 'Stylist', description: 'Designed your own avatar', icon: 'palette', roles: '*' },
   { key: 'first_request', name: 'First Steps', description: 'Raised your first support request', icon: 'ticket', roles: 'candidate' },
-  { key: 'closer', name: 'Closer', description: 'Confirmed a resolution and closed a request', icon: 'check', roles: 'candidate' },
-  { key: 'feedback', name: 'Voice Heard', description: 'Rated the support you received', icon: 'star', roles: 'candidate' },
-  { key: 'milestone_training', name: 'Trained Up', description: 'Started the In Training stage', icon: 'flag', roles: 'candidate' },
-  { key: 'milestone_work_ready', name: 'Work Ready', description: 'Signed off as work ready', icon: 'flag', roles: 'candidate' },
-  { key: 'milestone_placed', name: 'Placed', description: 'Started a corporate internship', icon: 'trophy', roles: 'candidate' },
-  { key: 'milestone_completed', name: 'Graduate', description: 'Completed the CAPACITI programme', icon: 'trophy', roles: 'candidate' },
-  { key: 'solver', name: 'Problem Solver', description: 'Resolved 5 support requests', icon: 'bolt', roles: 'staff' },
+  { key: 'closer', name: 'Closer', description: 'Confirmed a resolution and closed a request', icon: 'checkCircle', roles: 'candidate' },
+  { key: 'feedback', name: 'Voice Heard', description: 'Rated the support you received', icon: 'stamp', roles: 'candidate' },
+  { key: 'milestone_training', name: 'Trained Up', description: 'Started the In Training stage', icon: 'milestone', roles: 'candidate' },
+  { key: 'milestone_work_ready', name: 'Work Ready', description: 'Signed off as work ready', icon: 'milestone', roles: 'candidate' },
+  { key: 'milestone_placed', name: 'Placed', description: 'Started a corporate internship', icon: 'rosette', roles: 'candidate' },
+  { key: 'milestone_completed', name: 'Graduate', description: 'Completed the CAPACITI programme', icon: 'rosette', roles: 'candidate' },
+  { key: 'solver', name: 'Problem Solver', description: 'Resolved 5 support requests', icon: 'ribbon', roles: 'staff' },
   { key: 'helper', name: 'Town Crier', description: 'Posted your first announcement', icon: 'megaphone', roles: 'staff' },
 ];
 

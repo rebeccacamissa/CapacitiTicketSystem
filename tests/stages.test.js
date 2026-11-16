@@ -63,7 +63,7 @@ test('facilitators only see candidates in their streams', async () => {
   assert.equal((await call('fac', 'GET', `/candidates/${ids.cloud}`)).status, 404);
   assert.equal((await call('fac', 'GET', `/progress/${ids.dev}`)).status, 200);
   assert.equal((await call('fac', 'GET', '/requests')).status, 403);
-  assert.equal((await call('support', 'POST', `/stages/candidates/${ids.dev}/decisions`, { toStage: 'training', reason: 'Not my call' })).status, 403);
+  assert.equal((await call('rec', 'POST', `/stages/candidates/${ids.dev}/decisions`, { toStage: 'training', reason: 'Not my call' })).status, 403);
 });
 
 test('forward decisions go one step at a time; same-stage decisions are blocked', async () => {
@@ -103,7 +103,7 @@ test('the database itself rejects stage changes that bypass the rules', async ()
   // A raw decision that skips a stage, comes from the wrong person, or moves back without an admin.
   await assert.rejects(() => db.run("INSERT INTO stage_decisions (candidate_id, from_stage, to_stage, direction, decided_by, reason) VALUES (?, 'enrolled', 'placed', 'forward', ?, 'skip it')", ids.dev, ids.admin), /STAGE_SKIP/);
   await assert.rejects(() => db.run("INSERT INTO stage_decisions (candidate_id, from_stage, to_stage, direction, decided_by, reason) VALUES (?, 'enrolled', 'training', 'forward', ?, 'not allowed')", ids.cloud, ids.fac), /STAGE_NOT_AUTHORISED/);
-  await assert.rejects(() => db.run("INSERT INTO stage_decisions (candidate_id, from_stage, to_stage, direction, decided_by, reason) VALUES (?, 'enrolled', 'training', 'forward', ?, 'support cannot')", ids.dev, ids.support), /STAGE_NOT_AUTHORISED/);
+  await assert.rejects(() => db.run("INSERT INTO stage_decisions (candidate_id, from_stage, to_stage, direction, decided_by, reason) VALUES (?, 'enrolled', 'training', 'forward', ?, 'recruiter cannot')", ids.dev, ids.rec), /STAGE_NOT_AUTHORISED/);
   await assert.rejects(() => db.run("INSERT INTO stage_decisions (candidate_id, from_stage, to_stage, direction, decided_by, reason) VALUES (?, 'enrolled', 'enrolled', 'forward', ?, 'same stage')", ids.dev, ids.admin), /STAGE_UNCHANGED/);
   // The trail is append-only.
   await assert.rejects(() => db.run("UPDATE stage_decisions SET reason = 'edited'"), /AUDIT_LOG_IMMUTABLE/);
@@ -120,7 +120,7 @@ test('stage audit trail: admin sees all, facilitator their streams, candidate th
   assert.equal((await call('fac', 'GET', `/stages/decisions?candidateId=${ids.cloud}`)).status, 404);
   const mine = await call('dev', 'GET', '/stages/decisions');
   assert.ok(mine.body.decisions.every((d) => d.candidateId === ids.dev));
-  assert.equal((await call('support', 'GET', '/stages/decisions')).status, 403);
+  assert.equal((await call('support', 'GET', '/stages/decisions')).status, 200); // support coaches can review the trail
   assert.equal((await call('rec', 'GET', '/stages/decisions')).status, 403);
 });
 
@@ -189,4 +189,20 @@ test('AI CV tailoring needs consent and reports itself unavailable without a key
 test('invented numbers in a tailored CV are flagged for the candidate to check', () => {
   assert.deepEqual(numbersNotInOriginal('Built 2 apps in 2025.', 'Built 2 apps in 2025, improving speed by 40%.'), ['40%']);
   assert.deepEqual(numbersNotInOriginal('Led a team of 3.', 'Led a team of 3.'), []);
+});
+
+test('support coaches can approve forward stages but only admins can move candidates back', async () => {
+  const cand = await db.one("SELECT stage FROM candidate_stages WHERE candidate_id = ?", ids.cloud);
+  const next = { enrolled: 'training', training: 'work_ready', work_ready: 'placed' }[cand.stage];
+  const fwd = await call('support', 'POST', `/stages/candidates/${ids.cloud}/decisions`, { toStage: next, reason: 'Coach verified the evidence.' });
+  assert.equal(fwd.status, 201);
+  const back = await call('support', 'POST', `/stages/candidates/${ids.cloud}/decisions`, { toStage: cand.stage, reason: 'Trying to roll back the stage.' });
+  assert.equal(back.status, 403);
+  assert.equal(back.body.error.code, 'STAGE_BACKWARD_ADMIN_ONLY');
+  const rollback = await call('admin', 'POST', `/stages/candidates/${ids.cloud}/decisions`, { toStage: cand.stage, reason: 'Administrative correction: evidence was recorded on the wrong candidate.' });
+  assert.equal(rollback.status, 201);
+  assert.equal(rollback.body.direction, 'backward');
+  const trail = (await call('admin', 'GET', `/stages/decisions?candidateId=${ids.cloud}`)).body.decisions;
+  assert.equal(trail[0].direction, 'backward');
+  assert.equal(trail[0].decidedBy, 'Admin User');
 });

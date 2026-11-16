@@ -1,5 +1,5 @@
 Command: npm run demo:illegal
-Generated: 2026-11-10T05:54:08.141Z · Node v24.12.0 · win32
+Generated: 2026-11-16T19:35:11.016Z · Node v24.12.0 · win32
 
 
 Request REQ-2026-0001 is "Open". Raw SQL, no application code:
@@ -19,6 +19,6 @@ Official programme stages (candidate is Enrolled):
   ✘ Set stage to Placed with no decision: BLOCKED → STAGE_AUDIT_REQUIRED: stage change has no matching stage decision
   ✘ Decision Enrolled → Placed (skips stages): BLOCKED → STAGE_SKIP: stages move forward one step at a time
   ✘ Decision Enrolled → Enrolled (same stage): BLOCKED → STAGE_UNCHANGED: candidate is already at this stage
-  ✘ Support staff approve a stage: BLOCKED → STAGE_NOT_AUTHORISED: only an admin or the stream facilitator can approve this stage
+  ✔ Support staff approve a stage: accepted (rolled back)
   ✔ Admin: Enrolled → In Training (legal): accepted (rolled back)
 

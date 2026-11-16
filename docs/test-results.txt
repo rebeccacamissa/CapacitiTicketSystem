@@ -1,83 +1,93 @@
 Command: npm run test:report
-Generated: 2026-11-10T05:54:08.141Z · Node v24.12.0 · win32
+Generated: 2026-11-16T19:35:11.016Z · Node v24.12.0 · win32
 
-✔ demo shortcuts are off unless DEMO_MODE=true (30093.0081ms)
-[email:password_reset] (not sent: RESEND_API_KEY not set) to=ann@t.test subject="Reset your CAPACITI password" link=http://localhost:3000/reset-password?token=5NWvzyBXtAkg25lniEqidVX2JKcIyuD7pI8Zf520fi4
-[email:password_reset] (not sent: RESEND_API_KEY not set) to=ann@t.test subject="Reset your CAPACITI password" link=http://localhost:3000/reset-password?token=_ysn7VpZKmDLQNk7WPwAnX_ewyRS-mx0UzYPq9oUYZI
-[email:password_reset] (not sent: RESEND_API_KEY not set) to=ann@t.test subject="Reset your CAPACITI password" link=http://localhost:3000/reset-password?token=RzSW8AGrdOEdQSbxOE8TJoRLkd1OAzlJuBPB4I-CWt8
-✔ password reset: no enumeration, single-use, expiring token (369.3942ms)
+✔ demo shortcuts are off unless DEMO_MODE=true (39655.6357ms)
+[email:password_reset] (not sent: RESEND_API_KEY not set) to=ann@t.test subject="Reset your CAPACITI password" link=http://localhost:3000/reset-password?token=8GE1XO9zNk1O6XbsRbS7v59x39STdXVArxz5jOLU1-E
+[email:password_reset] (not sent: RESEND_API_KEY not set) to=ann@t.test subject="Reset your CAPACITI password" link=http://localhost:3000/reset-password?token=deOgZ6p4aXvxxl1eNE6GhPlnlDKyF754RBt3W3tOVls
+[email:password_reset] (not sent: RESEND_API_KEY not set) to=ann@t.test subject="Reset your CAPACITI password" link=http://localhost:3000/reset-password?token=vsvKo07OsfMVMWtUVo59sQ9wnrma3ewjgBqJdrZ2v6w
+✔ password reset: no enumeration, single-use, expiring token (521.9547ms)
 [email:review_request] (not sent: RESEND_API_KEY not set) to=fac@t.test subject="Ann Candidate asked for a stage review" link=http://localhost:3000/stage-decisions?candidate=5
 [email:stage_decision] (not sent: RESEND_API_KEY not set) to=ann@t.test subject="You've moved to In Training" link=http://localhost:3000/dashboard#roadmap
-✔ candidate-requested review alerts the facilitator; a decision resolves it (644.7636ms)
+✔ candidate-requested review alerts the facilitator; a decision resolves it (823.865ms)
 [email:stage_decision] (not sent: RESEND_API_KEY not set) to=ben@t.test subject="You've moved to In Training" link=http://localhost:3000/dashboard#roadmap
 [email:stage_decision] (not sent: RESEND_API_KEY not set) to=cat@t.test subject="You've moved to In Training" link=http://localhost:3000/dashboard#roadmap
-✔ batch approval: one shared note, per-candidate results, scope respected (464.7109ms)
-✔ candidates past their stage target are flagged (123.8515ms)
-✔ evidence linking: staff link a candidate document to a verified checklist item (474.9623ms)
+✔ batch approval: one shared note, per-candidate results, scope respected (691.8751ms)
+✔ candidates past their stage target are flagged (169.0987ms)
+✔ evidence linking: staff link a candidate document to a verified checklist item (522.2277ms)
 [email:interview_request] (not sent: RESEND_API_KEY not set) to=ann@t.test subject="Interview request from Acme Ltd" link=http://localhost:3000/dashboard#interviews
 [email:interview_response] (not sent: RESEND_API_KEY not set) to=rec@t.test subject="Ann Candidate accepted your interview request" link=http://localhost:3000/interviews
-✔ interview requests: recruiter invites, candidate responds, staff can see (385.9777ms)
+✔ interview requests: recruiter invites, candidate responds, staff can see (498.2882ms)
 [email:placement_report] (not sent: RESEND_API_KEY not set) to=fac@t.test subject="Placement to confirm: Ann Candidate" link=http://localhost:3000/stage-decisions#placements
 [email:stage_decision] (not sent: RESEND_API_KEY not set) to=ann@t.test subject="You've moved to Work Ready" link=http://localhost:3000/dashboard#roadmap
 [email:stage_decision] (not sent: RESEND_API_KEY not set) to=ann@t.test subject="You've moved to Placed" link=http://localhost:3000/dashboard#roadmap
 [email:placement] (not sent: RESEND_API_KEY not set) to=rec@t.test subject="Placement confirmed: Acme Ltd"
-✔ placement: recruiter reports, facilitator confirms only from Work Ready (552.2085ms)
-✔ talent filters: skills, cohort, documents and stage sort (347.9146ms)
-✔ exports: shortlist and audit trail as CSV (formula-safe) and PDF (389.5362ms)
-✔ programme reports: stage times, placement rates, velocity, CSV (378.1497ms)
-✔ CV builder: validate, save and generate a PDF into documents (165.7087ms)
-✔ mock interview works without AI: question bank and self-review feedback (114.2588ms)
+✔ placement: recruiter reports, facilitator confirms only from Work Ready (612.2069ms)
+✔ talent filters: skills, cohort, documents and stage sort (488.6443ms)
+✔ exports: shortlist and audit trail as CSV (formula-safe) and PDF (468.0783ms)
+✔ programme reports: stage times, placement rates, velocity, CSV (383.6025ms)
+✔ CV builder: validate, save and generate a PDF into documents (244.7364ms)
+✔ mock interview works without AI: question bank and self-review feedback (130.3173ms)
 [email:privacy_request] (not sent: RESEND_API_KEY not set) to=admin@t.test subject="Account deletion request (POPIA)" link=http://localhost:3000/admin#privacy
 [email:privacy_request] (not sent: RESEND_API_KEY not set) to=admin2@t.test subject="Account deletion request (POPIA)" link=http://localhost:3000/admin#privacy
 [email:privacy_outcome] (not sent: RESEND_API_KEY not set) to=ben@t.test subject="Your CAPACITI account has been deleted"
-✔ POPIA: export my data, request deletion, admin anonymises (506.445ms)
-✔ recruiters see only published profiles and cannot access ticket or candidate-management APIs (30694.2148ms)
-✔ candidates can publish their own portfolios and recruiters can read only the shared data (726.37ms)
-✔ facilitators only see candidates in their streams (30726.9885ms)
+✔ POPIA: export my data, request deletion, admin anonymises (528.073ms)
+✔ notifications are role-specific: candidates never get staff alerts (141.0905ms)
+[email:accessibility_needs] (not sent: RESEND_API_KEY not set) to=admin@t.test subject="Cat Candidate updated their accessibility needs" link=http://localhost:3000/candidates?id=7
+[email:accessibility_needs] (not sent: RESEND_API_KEY not set) to=admin2@t.test subject="Cat Candidate updated their accessibility needs" link=http://localhost:3000/candidates?id=7
+[email:accessibility_needs] (not sent: RESEND_API_KEY not set) to=fac@t.test subject="Cat Candidate updated their accessibility needs" link=http://localhost:3000/candidates?id=7
+✔ accessibility needs are routed to the coach/facilitator and admins (173.3371ms)
+✔ offline CAPACITI CV template works without AI and puts job-relevant skills first (167.5281ms)
+✔ recruiters see only published profiles and cannot access ticket or candidate-management APIs (39880.3251ms)
+✔ candidates can publish their own portfolios and recruiters can read only the shared data (946.7578ms)
+✔ facilitators only see candidates in their streams (39635.954ms)
 [email:stage_decision] (not sent: RESEND_API_KEY not set) to=dev@t.test subject="You've moved to In Training" link=http://localhost:3000/dashboard#roadmap
-✔ forward decisions go one step at a time; same-stage decisions are blocked (501.0845ms)
+✔ forward decisions go one step at a time; same-stage decisions are blocked (670.2607ms)
 [email:stage_decision] (not sent: RESEND_API_KEY not set) to=dev@t.test subject="Your programme stage changed to Enrolled" link=http://localhost:3000/dashboard#roadmap
-✔ backward moves are admin-only and need a written reason (201.288ms)
-✔ the database itself rejects stage changes that bypass the rules (99.2986ms)
+✔ backward moves are admin-only and need a written reason (270.033ms)
+✔ the database itself rejects stage changes that bypass the rules (129.4682ms)
 [email:stage_decision] (not sent: RESEND_API_KEY not set) to=cloud@t.test subject="You've moved to In Training" link=http://localhost:3000/dashboard#roadmap
-✔ stage audit trail: admin sees all, facilitator their streams, candidate their own (445.5506ms)
-✔ pipeline counts candidates by stage and stream (204.5534ms)
-✔ portfolio files: real type checks and access rules (385.3859ms)
-✔ recruiter shortlist is saved and private to each recruiter (320.6201ms)
-✔ AI CV tailoring needs consent and reports itself unavailable without a key (137.3306ms)
-✔ invented numbers in a tailored CV are flagged for the candidate to check (2.3677ms)
-✔ state machine rules (application layer) (30195.0597ms)
-✔ registration always creates a candidate and rejects weak passwords (80.5188ms)
-✔ candidate creates request with REQ-YYYY-NNNN reference (269.3361ms)
-✔ candidates cannot see other candidates' requests (111.1496ms)
-✔ illegal transition Open → Closed is rejected with 409 (57.1116ms)
-✔ DB probe proves the trigger blocks illegal transitions independently (125.0746ms)
+✔ stage audit trail: admin sees all, facilitator their streams, candidate their own (567.7843ms)
+✔ pipeline counts candidates by stage and stream (221.3842ms)
+✔ portfolio files: real type checks and access rules (446.8061ms)
+✔ recruiter shortlist is saved and private to each recruiter (447.5793ms)
+✔ AI CV tailoring needs consent and reports itself unavailable without a key (142.0884ms)
+✔ invented numbers in a tailored CV are flagged for the candidate to check (4.7801ms)
+[email:stage_decision] (not sent: RESEND_API_KEY not set) to=cloud@t.test subject="You've moved to Work Ready" link=http://localhost:3000/dashboard#roadmap
+[email:stage_decision] (not sent: RESEND_API_KEY not set) to=cloud@t.test subject="Your programme stage changed to In Training" link=http://localhost:3000/dashboard#roadmap
+✔ support coaches can approve forward stages but only admins can move candidates back (353.8721ms)
+✔ state machine rules (application layer) (38603.7293ms)
+✔ registration always creates a candidate and rejects weak passwords (139.7921ms)
+✔ candidate creates request with REQ-YYYY-NNNN reference (338.2696ms)
+✔ candidates cannot see other candidates' requests (152.1264ms)
+✔ illegal transition Open → Closed is rejected with 409 (72.4074ms)
+✔ DB probe proves the trigger blocks illegal transitions independently (161.8214ms)
 [email:ticket_status] (not sent: RESEND_API_KEY not set) to=c1@t.test subject="REQ-2026-0001 is now In Progress" link=http://localhost:3000/request?id=1
 [email:ticket_status] (not sent: RESEND_API_KEY not set) to=c1@t.test subject="REQ-2026-0001 is now Waiting for Candidate" link=http://localhost:3000/request?id=1
 [email:ticket_reply] (not sent: RESEND_API_KEY not set) to=support@t.test subject="New reply on REQ-2026-0001" link=http://localhost:3000/request?id=1
 [email:ticket_status] (not sent: RESEND_API_KEY not set) to=c1@t.test subject="REQ-2026-0001 is now Resolved" link=http://localhost:3000/request?id=1
 [email:ticket_status] (not sent: RESEND_API_KEY not set) to=support@t.test subject="REQ-2026-0001 is now Closed" link=http://localhost:3000/request?id=1
-✔ full workflow with audit trail + candidate auto-transition on reply (859.9748ms)
+✔ full workflow with audit trail + candidate auto-transition on reply (1161.7698ms)
 [email:ticket_status] (not sent: RESEND_API_KEY not set) to=c1@t.test subject="REQ-2026-0002 is now Closed" link=http://localhost:3000/request?id=2
-✔ admin override is allowed, audited, and one-shot (241.452ms)
-✔ audit log is immutable (17.7872ms)
-✔ verified evidence marks a stage ready for review but never moves the official stage (1194.9923ms)
-✔ analytics summary is staff-only (132.6841ms)
-✔ admin creates staff with a temporary password that must be changed (325.9291ms)
-✔ support can update candidate programme details; candidates cannot (77.1494ms)
-✔ Cammy answers with personalised context (123.9906ms)
-✔ new users get a plain gender-based avatar; designs are validated and locked items enforced (204.1761ms)
-✔ candidate rates a resolved request; attachments are type-checked and access controlled (328.4623ms)
-✔ cohort feed: staff announce, everyone reacts; search is scoped (226.5134ms)
-✔ preferences and walkthrough completion persist (142.2888ms)
-✔ accessibility needs are private to the candidate and staff (182.5335ms)
-✔ language preference is saved and Cammy answers in that language (117.7948ms)
-✔ extended accessibility preferences validate (82.2972ms)
-ℹ tests 47
+✔ admin override is allowed, audited, and one-shot (299.5245ms)
+✔ audit log is immutable (24.6374ms)
+✔ verified evidence marks a stage ready for review but never moves the official stage (1352.8471ms)
+✔ analytics summary is staff-only (213.0904ms)
+✔ admin creates staff with a temporary password that must be changed (536.1672ms)
+✔ support can update candidate programme details; candidates cannot (108.2542ms)
+✔ Cammy answers with personalised context (128.9745ms)
+✔ new users get a plain gender-based avatar; designs are validated and locked items enforced (324.1561ms)
+✔ candidate rates a resolved request; attachments are type-checked and access controlled (402.9275ms)
+✔ cohort feed: staff announce, everyone reacts; search is scoped (328.0378ms)
+✔ preferences and walkthrough completion persist (164.0259ms)
+[email:accessibility_needs] (not sent: RESEND_API_KEY not set) to=admin@t.test subject="Cand One updated their accessibility needs" link=http://localhost:3000/candidates?id=3
+✔ accessibility needs are private to the candidate and staff (200.2742ms)
+✔ language preference is saved and Cammy answers in that language (145.6074ms)
+✔ extended accessibility preferences validate (70.1561ms)
+ℹ tests 51
 ℹ suites 0
-ℹ pass 47
+ℹ pass 51
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 48203.1281
+ℹ duration_ms 58519.1575

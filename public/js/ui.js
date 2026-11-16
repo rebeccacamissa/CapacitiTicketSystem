@@ -186,3 +186,19 @@ export function setBusy(button, busy, label = 'Working…') {
 export const miniMd = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong class="text-white">$1</strong>').replace(/\n/g, '<br>');
 
 export const qs = (sel, root = document) => root.querySelector(sel);
+
+/**
+ * Attach suggestion lists (CAPACITI team names) to mentor / tech champ / supervisor
+ * inputs inside `root`. Free text is still allowed.
+ */
+export function attachTeamLists(root, options) {
+  const lists = { mentor: options.mentors, techChamp: options.techChamps, supervisor: options.supervisors };
+  for (const [name, values] of Object.entries(lists)) {
+    if (!values) continue;
+    const id = `team-list-${name}`;
+    if (!document.getElementById(id)) {
+      document.body.insertAdjacentHTML('beforeend', `<datalist id="${id}">${values.map((v) => `<option value="${esc(v)}">`).join('')}</datalist>`);
+    }
+    root.querySelectorAll(`input[name="${name}"]`).forEach((input) => input.setAttribute('list', id));
+  }
+}

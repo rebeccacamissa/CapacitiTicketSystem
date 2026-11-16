@@ -5,7 +5,7 @@ import { icon } from '../icons.js';
 import { onLive } from '../live.js';
 import { stageBadge, decisionItem } from '../components/stage-ui.js';
 
-const user = await initPage({ roles: ['admin', 'facilitator'] });
+const user = await initPage({ roles: ['admin', 'facilitator', 'support'] });
 const isAdmin = user.role === 'admin';
 const BACKWARD_MIN = 10;
 const form = document.getElementById('decide');

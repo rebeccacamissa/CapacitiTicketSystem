@@ -20,25 +20,66 @@ router.use(authenticate);
 const idParam = validate({ id: { type: 'int', required: true, min: 1 } }, 'params');
 
 // ---- CV builder --------------------------------------------------------------------
+/** CV data from what the programme already knows: profile, shared portfolio, projects, certificates. */
+async function prefill(db, userId) {
+  const p = await db.one(`SELECT u.full_name, u.email, cp.stream, pf.headline, pf.summary, pf.skills, pf.github_url
+    FROM users u LEFT JOIN candidate_profiles cp ON cp.user_id = u.id LEFT JOIN candidate_portfolios pf ON pf.candidate_id = u.id WHERE u.id = ?`, userId);
+  const projects = await db.all('SELECT title, description, project_url FROM portfolio_items WHERE candidate_id = ? ORDER BY id', userId);
+  const certs = await db.all("SELECT title, created_at FROM portfolio_files WHERE candidate_id = ? AND kind = 'certificate' ORDER BY created_at", userId);
+  return {
+    fullName: p.full_name, email: p.email, headline: p.headline || (p.stream ? `${p.stream} candidate` : ''), summary: p.summary || '',
+    skills: JSON.parse(p.skills || '[]'), github: p.github_url || '', phone: '', location: '', linkedin: '',
+    experience: [], education: [{ qualification: `CAPACITI ${p.stream || 'Digital Skills'} Programme`, institution: 'CAPACITI (UVU Africa)', year: String(new Date().getFullYear()) }],
+    projects: projects.map((x) => ({ name: x.title, description: x.description, link: x.project_url || '' })),
+    certifications: certs.map((c) => ({ name: c.title, issuer: '', year: c.created_at.slice(0, 4) })),
+  };
+}
+
 router.get('/cv', authorize('candidate'), async (req, res) => {
   const db = getDb();
   const row = await db.one('SELECT data, updated_at FROM cv_profiles WHERE candidate_id = ?', req.user.id);
   if (row) return res.json({ cv: JSON.parse(row.data), updatedAt: row.updated_at, limits: builder.LIMITS });
-  // First visit: prefill from what we already know (profile + shared portfolio).
-  const p = await db.one(`SELECT u.full_name, u.email, cp.stream, pf.headline, pf.summary, pf.skills, pf.github_url
-    FROM users u LEFT JOIN candidate_profiles cp ON cp.user_id = u.id LEFT JOIN candidate_portfolios pf ON pf.candidate_id = u.id WHERE u.id = ?`, req.user.id);
-  const projects = await db.all('SELECT title, description, project_url FROM portfolio_items WHERE candidate_id = ? ORDER BY id', req.user.id);
-  res.json({
-    cv: {
-      fullName: p.full_name, email: p.email, headline: p.headline || (p.stream ? `${p.stream} candidate` : ''), summary: p.summary || '',
-      skills: JSON.parse(p.skills || '[]'), github: p.github_url || '', phone: '', location: '', linkedin: '',
-      experience: [], education: [{ qualification: `CAPACITI ${p.stream || 'Digital Skills'} Programme`, institution: 'CAPACITI (UVU Africa)', year: String(new Date().getFullYear()) }],
-      projects: projects.map((x) => ({ name: x.title, description: x.description, link: x.project_url || '' })), certifications: [],
-    },
-    updatedAt: null,
-    limits: builder.LIMITS,
-  });
+  // First visit: prefill from what we already know.
+  res.json({ cv: await prefill(db, req.user.id), updatedAt: null, limits: builder.LIMITS });
 });
+
+/**
+ * Offline CAPACITI CV template (works without any AI service). Uses the saved CV-builder
+ * data, or the profile/portfolio, plus the programme record (stream, cohort, official stage,
+ * verified achievements). With a target job, skills and projects the advert mentions are
+ * listed first: nothing is added or reworded.
+ */
+router.post(
+  '/cv/template',
+  authorize('candidate'),
+  validate({ jobTitle: { type: 'string', max: 120 }, jobDescription: { type: 'string', max: 6000 }, save: { type: 'bool' } }),
+  async (req, res) => {
+    const db = getDb();
+    const row = await db.one('SELECT data FROM cv_profiles WHERE candidate_id = ?', req.user.id);
+    const cv = builder.clean(row ? JSON.parse(row.data) : await prefill(db, req.user.id));
+    const words = `${req.body.jobTitle || ''} ${req.body.jobDescription || ''}`.toLowerCase();
+    if (words.trim()) {
+      const hit = (term) => !!term && words.includes(String(term).toLowerCase());
+      cv.skills = [...cv.skills.filter(hit), ...cv.skills.filter((x) => !hit(x))];
+      const relevance = (x) => cv.skills.filter((k) => hit(k) && `${x.name} ${x.description}`.toLowerCase().includes(k.toLowerCase())).length;
+      cv.projects = [...cv.projects].sort((a, b) => relevance(b) - relevance(a));
+    }
+    const prog = (await db.one(`SELECT cp.stream, cp.cohort, COALESCE(ps.label, 'Enrolled') AS stage FROM candidate_profiles cp
+      LEFT JOIN candidate_stages cs ON cs.candidate_id = cp.user_id LEFT JOIN programme_stages ps ON ps.key = cs.stage WHERE cp.user_id = ?`, req.user.id)) || {};
+    const achievements = (await db.all(`SELECT mr.label FROM candidate_requirement_progress p JOIN milestone_requirements mr ON mr.id = p.requirement_id
+      JOIN milestones m ON m.id = mr.milestone_id WHERE p.candidate_id = ? AND m.key <> 'enrolled' ORDER BY m.sort_order, mr.sort_order`, req.user.id))
+      .map((r) => `${r.label} (verified by CAPACITI)`);
+    const pdf = await builder.renderPdf(cv, { template: 'capaciti', targetRole: req.body.jobTitle || '', programme: { stream: prog.stream, cohort: prog.cohort, stage: prog.stage || 'Enrolled', achievements } });
+    const title = `${cv.fullName || 'My'} CAPACITI CV${req.body.jobTitle ? ` (${req.body.jobTitle})` : ''}`.slice(0, 120);
+    if (req.body.save) {
+      const file = await portfolio.saveGenerated(db, req.user.id, { title, buf: pdf, ext: 'pdf', mime: 'application/pdf', source: 'cv_builder' });
+      return res.status(201).json({ file });
+    }
+    const safe = title.replace(/[^\w ()-]/g, '').trim() || 'CAPACITI CV';
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${safe}.pdf"`, 'Cache-Control': 'no-store' });
+    res.send(pdf);
+  }
+);
 
 router.put('/cv', authorize('candidate'), async (req, res) => {
   const cv = builder.clean(req.body?.cv);

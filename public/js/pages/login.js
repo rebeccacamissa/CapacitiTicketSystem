@@ -60,19 +60,20 @@ form.addEventListener('submit', async (e) => {
 // Demo role sign-in (only when DEMO_MODE=true on the server)
 const DEMO_INFO = {
   candidate: ['user', 'Journey roadmap, tickets, birthday countdown'],
-  support: ['users', 'Ticket queue, workload, update candidates'],
-  admin: ['shield', 'Add/remove users, roles, categories, analytics'],
-  recruiter: ['users', 'Explore shared talent profiles and portfolios'],
-  facilitator: ['flag', 'Review evidence and approve stage decisions'],
+  support: ['users', 'Ticket queue, IT and technical support, stage approvals'],
+  admin: ['shield', 'Leads the coaches: users, reports, rollbacks, privacy'],
+  recruiter: ['trophy', 'Places candidates with partner companies'],
+  facilitator: ['flag', 'Coaches candidates, reviews evidence and approves stage moves'],
 };
 api('/auth/demo-accounts').then(({ enabled, accounts }) => {
   if (!enabled || !accounts.length) return;
   document.getElementById('demo').classList.remove('hidden');
-  const order = ['candidate', 'support', 'admin', 'facilitator', 'recruiter'];
+  const order = ['candidate', 'facilitator', 'support', 'admin', 'recruiter'];
   document.getElementById('demo-buttons').innerHTML = accounts.sort((a, b) => order.indexOf(a.role) - order.indexOf(b.role)).map((a) => `
     <button type="button" data-role="${a.role}" class="glow-ring flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-left transition hover:-translate-y-0.5 hover:bg-white/10">
       <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple/50 to-salmon/40">${icon(DEMO_INFO[a.role][0])}</span>
-      <span class="min-w-0 flex-1"><span class="block text-sm font-semibold">${ROLE_LABEL[a.role]} <span class="font-normal text-white/50">· ${esc(a.name)}</span></span>
+      <span class="min-w-0 flex-1"><span class="block text-sm font-semibold">${esc(a.name)} <span class="font-normal text-white/50">· ${ROLE_LABEL[a.role]}</span></span>
+      ${a.title ? `<span class="block truncate text-xs font-medium text-salmon-50">${esc(a.title)}</span>` : ''}
       <span class="block truncate text-xs text-white/50">${DEMO_INFO[a.role][1]}</span></span>
       <span class="text-white/40">${icon('arrowRight', 'h-4 w-4')}</span>
     </button>`).join('');

@@ -6,7 +6,7 @@
 - **Framework:** Node's built-in test runner (`node:test` + `node:assert`). No extra test dependencies.
 - **Scope:** end-to-end API tests. Each run starts the real Express app on a random port against a fresh **in-memory PostgreSQL database (PGlite)**, then makes real HTTP calls with cookies.
 
-**Latest run: 47 passed, 0 failed** (21 core + 2 recruiter + 10 stages + 14 features). The full output is in [test-results.txt](test-results.txt).
+**Latest run: 51 passed, 0 failed** (21 core + 2 recruiter + 11 stages + 17 features). The full output is in [test-results.txt](test-results.txt).
 
 | # | Test | What it proves |
 |---|---|---|
@@ -102,12 +102,12 @@ Every page was opened in headless Chrome at 1440 px (desktop) and 390 px (mobile
 
 | Area | How to check |
 |---|---|
-| Live updates | Sign in as a candidate and as Thabo in two browsers. Change the candidate's request status as Thabo; the candidate's page should update without a refresh. |
+| Live updates | Sign in as Rebecca and as Bradley in two browsers. Change Rebecca's request status as Bradley; the candidate's page should update without a refresh. |
 | Keyboard-only use | Tab through each page; press `?` for shortcuts; check every control can be reached and its focus is visible. |
 | Screen reader | Run NVDA (Windows) or VoiceOver (Mac) on registration, new request and request detail; check labels, errors and announcements. |
 | Read-aloud and voice input | Chrome or Edge with a microphone. Voices in isiZulu, isiXhosa and Sepedi depend on what's installed on the device. |
 | Translations | A native speaker of each language should read every screen. |
-| AI CV tailoring and AI interviewer | Set `ANTHROPIC_API_KEY`, upload a PDF CV as Lerato, tailor it for a real job advert, and compare the draft line by line with the original: nothing should be invented or inflated. Then run an AI practice interview. |
+| AI CV tailoring and AI interviewer | Set `ANTHROPIC_API_KEY`, upload a PDF CV as Rebecca, tailor it for a real job advert, and compare the draft line by line with the original: nothing should be invented or inflated. Then run an AI practice interview. |
 | Real email delivery | Set `RESEND_API_KEY` and a verified `EMAIL_FROM`, then use "Forgot your password?" and make a stage decision; check both emails arrive and links work. |
 | Neon | Set `DATABASE_URL`, run `npm run db:copy-sqlite` or `npm run db:seed`, redeploy, and confirm the data survives. |
 | Mobile | New and changed pages were checked in headless Chrome at 390 px: no horizontal page overflow (measured) and no script errors. Real-device testing is still recommended. |

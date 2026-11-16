@@ -61,7 +61,7 @@ Every error looks like this:
 
 ```bash
 curl -c jar.txt -H "Content-Type: application/json" \
-     -d '{"email":"thabo@capaciti.org.za","password":"Capaciti@2026"}' http://localhost:3000/api/auth/login
+     -d '{"email":"bradley@capaciti.org.za","password":"Capaciti@2026"}' http://localhost:3000/api/auth/login
 ```
 
 ## 3. Support requests (`/requests`)

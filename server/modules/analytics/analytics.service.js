@@ -42,16 +42,16 @@ async function summary(db) {
   `);
 
   const workload = (await db.all(`
-    SELECT u.id, u.full_name AS name, u.role, u.gender, u.avatar_config,
+    SELECT u.id, u.full_name AS name, u.role, sp.position, u.gender, u.avatar_config,
       COUNT(r.id) FILTER (WHERE r.${ACTIVE})                              AS active,
       COUNT(r.id) FILTER (WHERE r.${ACTIVE} AND r.due_at < now_iso())     AS overdue,
       COUNT(r.id) FILTER (WHERE r.resolved_at IS NOT NULL)                AS resolved,
       ROUND(AVG(${HOURS('r.created_at', 'r.resolved_at')}) FILTER (WHERE r.resolved_at IS NOT NULL)::numeric, 1) AS avg_resolution_hours,
       (SELECT ROUND(AVG(rr.rating), 1) FROM request_ratings rr JOIN requests r2 ON r2.id = rr.request_id WHERE r2.assigned_to = u.id) AS avg_rating,
       (SELECT COUNT(*) FROM request_ratings rr JOIN requests r2 ON r2.id = rr.request_id WHERE r2.assigned_to = u.id) AS ratings
-    FROM users u LEFT JOIN requests r ON r.assigned_to = u.id
+    FROM users u LEFT JOIN staff_profiles sp ON sp.user_id = u.id LEFT JOIN requests r ON r.assigned_to = u.id
     WHERE u.role IN ('support','admin') AND u.is_active = 1
-    GROUP BY u.id ORDER BY active DESC, u.full_name
+    GROUP BY u.id, sp.position ORDER BY active DESC, u.full_name
   `)).map(({ avatar_config, gender, ...w }) => ({ ...w, avatar: avatarOf({ avatar_config, gender }) }));
 
   const resolutionByCategory = await db.all(`
@@ -64,9 +64,9 @@ async function summary(db) {
   `);
 
   const oldestOverdue = await db.all(`
-    SELECT r.id, r.reference, r.title, r.priority, r.status, r.due_at, au.full_name AS assignee_name,
+    SELECT r.id, r.reference, r.title, r.priority, r.status, r.due_at, au.full_name AS assignee_name, au.role AS assignee_role, asp.position AS assignee_position,
       ROUND(${HOURS('r.due_at', 'now_iso()')}::numeric, 1) AS hours_overdue
-    FROM requests r LEFT JOIN users au ON au.id = r.assigned_to
+    FROM requests r LEFT JOIN users au ON au.id = r.assigned_to LEFT JOIN staff_profiles asp ON asp.user_id = au.id
     WHERE r.${ACTIVE} AND r.due_at < now_iso()
     ORDER BY r.due_at ASC LIMIT 8
   `);
@@ -97,8 +97,10 @@ async function summary(db) {
   const csatRow = await db.one('SELECT ROUND(AVG(rating), 2) AS avg, COUNT(*) AS count FROM request_ratings');
   const dist = Object.fromEntries((await db.all('SELECT rating, COUNT(*) n FROM request_ratings GROUP BY rating')).map((r) => [r.rating, r.n]));
   const recentRatings = await db.all(`
-    SELECT rr.rating, rr.comment, rr.created_at, r.reference, r.id, u.full_name AS candidate_name
+    SELECT rr.rating, rr.comment, rr.created_at, r.reference, r.id, u.full_name AS candidate_name,
+           au.full_name AS assignee_name, asp.position AS assignee_position
     FROM request_ratings rr JOIN requests r ON r.id = rr.request_id JOIN users u ON u.id = rr.candidate_id
+    LEFT JOIN users au ON au.id = r.assigned_to LEFT JOIN staff_profiles asp ON asp.user_id = au.id
     WHERE rr.comment IS NOT NULL ORDER BY rr.created_at DESC LIMIT 4
   `);
   const csat = { avg: csatRow.avg, count: csatRow.count, distribution: [5, 4, 3, 2, 1].map((n) => ({ rating: n, count: dist[n] || 0 })), recent: recentRatings };

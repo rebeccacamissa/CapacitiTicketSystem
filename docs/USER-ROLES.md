@@ -7,7 +7,7 @@ The system has five roles: the three core roles below, plus **Facilitator** and 
 | **Who** | A learner on a CAPACITI programme | Programme managers and support specialists | Operations leads who run the platform |
 | **How the account is created** | Self-registration (`/register`) | Created by an admin, with a temporary password | Created by an admin, with a temporary password |
 | **Home page after sign-in** | `/dashboard`: *My dashboard* | `/insights`: *Support dashboard* | `/admin`: *Control centre* |
-| **Demo account** | `lerato@example.com` | `thabo@capaciti.org.za` | `admin@capaciti.org.za` |
+| **Demo account** | Rebecca Adams `rebecca@capaciti.org.za` | Bradley, IT Support Coordinator `bradley@capaciti.org.za` (also Eudene, Omphile, Tarryn) | Bianca, Lead Talent Development Coach `bianca@capaciti.org.za` (also Shadley) |
 
 All demo passwords are `Capaciti@2026`. When demo mode is on, the **View as** switcher in the top bar and the one-click buttons on the sign-in page switch roles instantly.
 
@@ -27,7 +27,7 @@ All demo passwords are `Capaciti@2026`. When demo mode is on, the **View as** sw
 | Rate a resolved request (1–5 stars) | ✔ | – | – |
 | See your own roadmap and progress | ✔ | – | – |
 | Verify a candidate's stage evidence (exit-criteria checklist) | – | ✔ | ✔ |
-| Approve an official stage decision (one step forward) | – | – | ✔ (facilitators too, for their streams) |
+| Approve an official stage decision (one step forward) | – | ✔ | ✔ (facilitators too, for their streams) |
 | Move a candidate back a stage (written reason required) | – | – | ✔ |
 | View the stage audit trail | Own decisions | – | All |
 | Programme pipeline (candidates by stage and stream) | – | – | ✔ |
@@ -50,7 +50,7 @@ All demo passwords are `Capaciti@2026`. When demo mode is on, the **View as** sw
 | **Who** | Learning facilitators responsible for one or more streams | Talent partners looking for work-ready candidates |
 | **How the account is created** | Created by an admin, who assigns their stream(s) | Created by an admin |
 | **Home page** | `/facilitator`: *My streams* | `/recruiter`: *Recruiter overview* |
-| **Demo account** | `facilitator@capaciti.org.za` (Software Development, Data Science & Analytics, Cybersecurity) | `recruiter@capaciti.org.za` |
+| **Demo account** | Liyabona, Talent Development Coach (Supervisor) `liyabona@capaciti.org.za` (Software Development, Data Science & Analytics, Cybersecurity) | Ehrin, Placement Specialist `ehrin@capaciti.org.za` |
 
 | Capability | Facilitator | Recruiter |
 |---|:-:|:-:|

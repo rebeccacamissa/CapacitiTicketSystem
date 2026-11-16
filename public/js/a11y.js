@@ -76,43 +76,110 @@ export const shouldAutoRead = () => autoRead;
 export const canSpeak = () => 'speechSynthesis' in window;
 let warnedVoice = false;
 
-function pickVoice() {
-  const want = langInfo().speech.toLowerCase();
-  const voices = speechSynthesis.getVoices();
-  return voices.find((v) => v.lang.toLowerCase() === want)
-    || voices.find((v) => v.lang.toLowerCase().startsWith(want.split('-')[0]))
-    || voices.find((v) => v.lang.toLowerCase() === 'en-za')
-    || voices.find((v) => v.lang.toLowerCase().startsWith('en'));
+/** Voices load asynchronously in Chrome/Edge; wait (briefly) for the list instead of using none. */
+let voicesReady = null;
+function loadVoices() {
+  if (voicesReady) return voicesReady;
+  voicesReady = new Promise((resolve) => {
+    const now = speechSynthesis.getVoices();
+    if (now.length) return resolve(now);
+    const done = () => resolve(speechSynthesis.getVoices());
+    speechSynthesis.addEventListener('voiceschanged', done, { once: true });
+    setTimeout(done, 1500); // some browsers never fire voiceschanged
+  });
+  return voicesReady;
 }
 
-export function speak(text, { onEnd } = {}) {
+// Smooth, natural-sounding voices first (Edge "Natural"/"Online", Google, Apple premium/enhanced).
+const NATURAL = /natural|neural|online|premium|enhanced|google|siri|samantha|daniel|karen|moira|tessa/i;
+const score = (v, want) => {
+  const lang = v.lang.toLowerCase().replace('_', '-');
+  let s = 0;
+  if (lang === want) s += 100;
+  else if (lang.startsWith(want.split('-')[0])) s += 60;
+  else if (lang === 'en-za') s += 40;
+  else if (lang.startsWith('en')) s += 30;
+  else return -1;
+  if (NATURAL.test(v.name)) s += 20;
+  if (v.localService === false) s += 5; // cloud voices are usually the smoothest
+  if (v.default) s += 2;
+  return s;
+};
+
+async function pickVoice() {
+  const want = langInfo().speech.toLowerCase();
+  const voices = (await loadVoices()).filter((v) => score(v, want) >= 0);
+  return voices.sort((a, b) => score(b, want) - score(a, want))[0] || null;
+}
+
+/** Split into sentence-sized pieces (Chrome cuts off utterances longer than ~15 s). */
+function chunk(text) {
+  const sentences = text.replace(/\s+/g, ' ').trim().match(/[^.!?;:]+[.!?;:]*/g) || [text];
+  const out = [];
+  for (const s of sentences) {
+    const piece = s.trim();
+    if (!piece) continue;
+    if (piece.length <= 220) { out.push(piece); continue; }
+    let rest = piece; // very long sentences: break at commas or spaces
+    while (rest.length > 220) {
+      const cut = Math.max(rest.lastIndexOf(', ', 220), rest.lastIndexOf(' ', 220));
+      out.push(rest.slice(0, cut > 40 ? cut + 1 : 220).trim());
+      rest = rest.slice(cut > 40 ? cut + 1 : 220);
+    }
+    if (rest.trim()) out.push(rest.trim());
+  }
+  return out;
+}
+
+let speechRun = 0; // identifies the current reading, so stale callbacks are ignored
+
+export async function speak(text, { onEnd } = {}) {
   if (!canSpeak() || !text?.trim()) return;
+  const run = ++speechRun;
   speechSynthesis.cancel();
-  const voice = pickVoice();
+  speakingUi(true);
+  let voice = null;
+  try { voice = await pickVoice(); } catch { /* use the browser default */ }
+  if (run !== speechRun) return; // stopped or replaced while voices loaded
   if (voice && !voice.lang.toLowerCase().startsWith(langInfo().speech.split('-')[0].toLowerCase()) && !warnedVoice) {
     warnedVoice = true;
     import('./ui.js').then((m) => m.toast(t('No {lang} voice is installed on this device, so an English voice will read instead.', { lang: langInfo().native }), 'info'));
   }
-  // Chrome stops long utterances, so speak sentence by sentence.
-  const chunks = text.replace(/\s+/g, ' ').match(/[^.!?]+[.!?]*/g) || [text];
-  chunks.forEach((c, i) => {
-    const u = new SpeechSynthesisUtterance(c.trim());
+  // Chrome can drop an utterance queued in the same tick as cancel(): give it a moment.
+  await new Promise((r) => setTimeout(r, 60));
+  if (run !== speechRun) return;
+  const pieces = chunk(text);
+  pieces.forEach((c, i) => {
+    const u = new SpeechSynthesisUtterance(c);
     if (voice) u.voice = voice;
     u.lang = voice?.lang || langInfo().speech;
     u.rate = speechRate;
-    if (i === chunks.length - 1) u.onend = () => { speakingUi(false); onEnd?.(); };
+    u.pitch = 1;
+    if (i === pieces.length - 1) u.onend = () => { if (run === speechRun) { speakingUi(false); onEnd?.(); } };
+    u.onerror = (e) => {
+      if (run !== speechRun || e.error === 'interrupted' || e.error === 'canceled') return;
+      speechRun += 1;
+      speechSynthesis.cancel();
+      speakingUi(false);
+      import('./ui.js').then((m) => m.toast(t('Read aloud stopped: this browser could not play the voice. Try another browser or check your sound settings.'), 'error'));
+    };
     speechSynthesis.speak(u);
   });
-  speakingUi(true);
+  if (speechSynthesis.paused) speechSynthesis.resume(); // Chrome sometimes starts paused after a tab switch
 }
-export function stopSpeaking() { if (canSpeak()) speechSynthesis.cancel(); speakingUi(false); }
+export function stopSpeaking() { speechRun += 1; if (canSpeak()) speechSynthesis.cancel(); speakingUi(false); }
+if (canSpeak()) { loadVoices(); addEventListener('pagehide', () => speechSynthesis.cancel()); }
 
 export function readPage() {
   const main = document.getElementById('main');
   if (!main) return;
-  const clone = main.cloneNode(true);
-  clone.querySelectorAll('[aria-hidden="true"], .sr-only, script, style, svg, [hidden]').forEach((n) => n.remove());
-  speak(`${document.querySelector('header h1')?.textContent || ''}. ${clone.innerText}`);
+  // innerText of the live page respects what is actually visible and keeps line breaks
+  // between blocks; turn those into pauses so headings and items aren't run together.
+  const text = main.innerText
+    .split(/\n+/).map((line) => line.trim()).filter((line) => line.length > 1)
+    .map((line) => (/[.!?:;]$/.test(line) ? line : `${line}.`))
+    .join(' ');
+  speak(`${document.querySelector('header h1')?.textContent || ''}. ${text}`);
 }
 
 let speakBar;

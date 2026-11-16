@@ -1,5 +1,10 @@
 // Line-icon set used everywhere instead of emoji (24×24, stroke-based, inherits currentColor).
 const P = {
+  // Achievement marks (tactile, no star bursts): a rosette, an award ribbon, a signpost milestone and a stamp.
+  rosette: 'M12 3.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11ZM12 6.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5ZM8.7 13.6 7 21l5-2.5 5 2.5-1.7-7.4',
+  ribbon: 'M12 3a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9ZM9.2 11 6.5 20l3-.8 1.8 2.6 1.2-6.3M14.8 11l2.7 9-3-.8-1.8 2.6-1.2-6.3',
+  milestone: 'M12 3v18M9 21h6M12 5h6.5L21 7.5 18.5 10H12M12 12H5.5L3 14.5 5.5 17H12',
+  stamp: 'M9 4h6l-1 6h-4zM5 14a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2H5zM5 19h14',
   home: 'M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z',
   chart: 'M4 20V11M10 20V5M16 20v-6M2 20h20',
   ticket: 'M4 4h16v16H4zM4 14h4l2 3h4l2-3h4',

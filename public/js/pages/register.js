@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { showFieldErrors, setBusy, esc, toast, reduceMotion } from '../ui.js';
+import { showFieldErrors, setBusy, esc, toast, reduceMotion, attachTeamLists } from '../ui.js';
 import { brandHtml, backgroundHtml } from '../layout.js';
 import { createAvatarBuilder } from '../components/avatar-builder.js';
 
@@ -23,6 +23,7 @@ let newUser = null;
 api('/meta/options').then((o) => {
   document.getElementById('cohorts').innerHTML = o.cohorts.map((c) => `<option value="${esc(c)}">`).join('');
   form.stream.insertAdjacentHTML('beforeend', o.streams.map((s) => `<option>${esc(s)}</option>`).join(''));
+  attachTeamLists(form, o);
 });
 const maxDob = new Date(); maxDob.setFullYear(maxDob.getFullYear() - 15);
 form.dateOfBirth.max = maxDob.toISOString().slice(0, 10);

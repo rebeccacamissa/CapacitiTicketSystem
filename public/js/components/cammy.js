@@ -42,7 +42,7 @@ export function mountCammy(user) {
         <button type="button" data-close class="rounded-xl p-2 text-white/80 hover:bg-white/15" aria-label="Close chat">${icon('close', 'h-5 w-5')}</button>
       </header>
       <ol id="cammy-log" class="flex-1 space-y-3 overflow-y-auto px-4 py-4" aria-live="polite"></ol>
-      <div id="cammy-suggest" class="flex gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none]"></div>
+      <div id="cammy-suggest" class="thin-scroll flex max-h-28 flex-wrap gap-2 overflow-y-auto px-4 pb-2" role="group" aria-label="Suggested questions"></div>
       <form id="cammy-form" class="flex items-center gap-2 border-t border-white/10 p-3">
         <label for="cammy-input" class="sr-only">Message Cammy</label>
         <input id="cammy-input" data-voice autocomplete="off" maxlength="500" placeholder="Ask Cammy anything…" class="field !rounded-full">
@@ -128,7 +128,7 @@ export function mountCammy(user) {
           ${res.actions?.length ? `<div class="flex flex-wrap gap-1.5">${res.actions.map((a) => `<a href="${esc(a.href)}" class="chip !border-salmon/40 !bg-salmon/15 !text-salmon-50 hover:!bg-salmon/30">${esc(a.label)}${icon('arrowRight', 'h-3 w-3')}</a>`).join('')}</div>` : ''}
         </div>
       </li>`);
-    $('#cammy-suggest').innerHTML = (res.suggestions || []).map((x) => `<button type="button" class="chip shrink-0" data-q="${esc(x.q || x)}">${esc(x.label || x)}</button>`).join('');
+    $('#cammy-suggest').innerHTML = (res.suggestions || []).map((x) => `<button type="button" class="chip max-w-full !whitespace-normal text-left" data-q="${esc(x.q || x)}">${esc(x.label || x)}</button>`).join('');
     scroll();
   }
 

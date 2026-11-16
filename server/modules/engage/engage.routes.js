@@ -10,6 +10,7 @@ const gamify = require('./gamification.service');
 const feed = require('./feed.service');
 const bus = require('../../realtime/bus');
 const { NEEDS } = require('../../config/accessibility');
+const email = require('../../services/email');
 
 const router = express.Router();
 router.use(authenticate);
@@ -75,7 +76,27 @@ router.put(
     if (needs.some((n) => !NEEDS.includes(n)) || needs.length > NEEDS.length) return next(badRequest('Unknown accessibility need'));
     if (notes.length > 500) return next(badRequest('Notes must be 500 characters or fewer'));
     const value = { needs: [...new Set(needs)], notes };
-    (await getDb().run('UPDATE users SET accessibility = ? WHERE id = ?', JSON.stringify(value), req.user.id));
+    const db = getDb();
+    await db.run('UPDATE users SET accessibility = ?, accessibility_updated_at = now_iso() WHERE id = ?', JSON.stringify(value), req.user.id);
+    // Route to the people who arrange accommodations: the candidate's supervisor / Talent
+    // Development Coach, their stream facilitator(s), and administrators. Only the fact that
+    // needs changed is emailed; the details are shown inside the app to authorised staff.
+    if (req.user.role === 'candidate' && value.needs.length) {
+      const prof = await db.one('SELECT stream, supervisor FROM candidate_profiles WHERE user_id = ?', req.user.id) || {};
+      const staff = await db.all(`
+        SELECT DISTINCT u.id, u.email FROM users u LEFT JOIN facilitator_streams fs ON fs.user_id = u.id
+        WHERE u.is_active = 1 AND (u.role = 'admin' OR (u.role = 'facilitator' AND fs.stream = ?)
+          OR (u.role IN ('support', 'facilitator') AND lower(u.full_name) = lower(?)))`, prof.stream || '', prof.supervisor || '');
+      for (const s of staff) {
+        email.notify(db, {
+          to: s.email, kind: 'accessibility_needs', subject: `${req.user.fullName} updated their accessibility needs`,
+          heading: `${req.user.fullName} updated their accessibility needs`,
+          lines: ['Please review them and arrange any accommodations (for example an interpreter, extra time or assistive technology).'],
+          cta: { label: 'Open candidate record', href: email.link(`/candidates?id=${req.user.id}`) },
+        });
+      }
+      bus.publish(staff.map((s) => s.id), 'notify', {});
+    }
     bus.publish('staff', 'people', { id: req.user.id });
     res.json({ accessibility: value });
   }

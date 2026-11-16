@@ -68,11 +68,13 @@ npm start                   # builds the CSS, then serves http://localhost:3000
 
 | Role | Email | Password |
 |---|---|---|
-| Candidate | `lerato@example.com` (also `sipho@`, `zanele@`, `kagiso@`, `amahle@` at `example.com`) | `Capaciti@2026` |
-| Support / Manager | `thabo@capaciti.org.za`, `aisha@capaciti.org.za` | `Capaciti@2026` |
-| Administrator | `admin@capaciti.org.za` | `Capaciti@2026` |
-| Facilitator | `facilitator@capaciti.org.za` | `Capaciti@2026` |
-| Recruiter | `recruiter@capaciti.org.za` | `Capaciti@2026` |
+| Candidate | **Rebecca Adams** `rebecca@capaciti.org.za` (supervisor Liyabona, tech champ Omphile, mentor Shadley). More candidates: `sipho@`, `zanele@`, `kagiso@`, `amahle@` at `example.com` | `Capaciti@2026` |
+| Facilitator | **Liyabona**, Talent Development Coach (Supervisor): `liyabona@capaciti.org.za` | `Capaciti@2026` |
+| Support | **Bradley**, IT Support Coordinator · **Eudene**, LAN & Desktop Support (FIT Team) · **Omphile**, Software Lead Tech Champ & Tech Mentor · **Tarryn**, Scrum Master (`<name>@capaciti.org.za`) | `Capaciti@2026` |
+| Administrator | **Bianca**, Lead Talent Development Coach · **Shadley**, Tech Delivery Manager & Tech Mentor | `Capaciti@2026` |
+| Recruiter | **Ehrin**, Placement Specialist: `ehrin@capaciti.org.za` | `Capaciti@2026` |
+
+The one-click demo buttons and the "Preview as" switcher use Rebecca, Liyabona, Bradley, Bianca and Ehrin.
 
 | Script | Purpose |
 |---|---|

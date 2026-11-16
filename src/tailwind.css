@@ -79,6 +79,11 @@
 }
 
 @layer components {
+  /* A slim, always-visible scrollbar (mouse, trackpad and touch friendly). */
+  .thin-scroll { scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / .35) transparent; }
+  .thin-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+  .thin-scroll::-webkit-scrollbar-thumb { background: rgb(255 255 255 / .35); border-radius: 999px; }
+  .thin-scroll::-webkit-scrollbar-track { background: transparent; }
   /* Keep absolutely-positioned descendants (e.g. sr-only labels) inside horizontal scrollers so they never widen the page. */
   .overflow-x-auto { position: relative; }
   /* ---- Surfaces ---- */

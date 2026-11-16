@@ -38,13 +38,6 @@ async function main() {
   const hash = bcrypt.hashSync(PASSWORD, 10);
 
   if ((await db.one('SELECT COUNT(*) n FROM users')).n > 0) {
-    // Databases seeded before the facilitator role existed still get the demo facilitator.
-    if (!await db.one("SELECT 1 FROM users WHERE email = 'facilitator@capaciti.org.za'")) {
-      const id = await db.insert("INSERT INTO users (full_name, first_name, surname, email, password_hash, role, date_of_birth, gender) VALUES ('Naledi Sithole', 'Naledi', 'Sithole', 'facilitator@capaciti.org.za', ?, 'facilitator', '1990-09-21', 'female')", hash);
-      await db.run("INSERT INTO staff_profiles (user_id, position) VALUES (?, 'Learning Facilitator')", id);
-      for (const stream of ['Software Development', 'Data Science & Analytics', 'Cybersecurity']) await db.run('INSERT INTO facilitator_streams (user_id, stream) VALUES (?, ?)', id, stream);
-      console.log('Added the demo facilitator account.');
-    }
     console.log('Database already has users — skipping seed. Use `npm run db:reset` to start fresh.');
     await db.close();
     return;
@@ -74,18 +67,30 @@ async function main() {
     return { id, role, fullName: name, firstName: first };
   }
 
-  const admin = await addUser('Nomsa Dlamini', 'admin@capaciti.org.za', 'admin', '1985-03-14', { position: 'Operations Lead', employeeId: 'CAP-0001', gender: 'female', avatar: { v: 2, art: 'polished', look: 'runway', skin: '7b4a2a', hair: 'bun', hairColor: '2c1b18', rearHair: 'none', facialHair: 'none', clothing: 'openJacket', clothesColor: '151613', bg: 'studio' } });
-  const sup1 = await addUser('Thabo Mokoena', 'thabo@capaciti.org.za', 'support', dobIn(21, 1992), { position: 'Programme Manager', employeeId: 'CAP-0142', gender: 'male' });
-  const sup2 = await addUser('Aisha Patel', 'aisha@capaciti.org.za', 'support', '1994-07-02', { position: 'Support Specialist', employeeId: 'CAP-0187', gender: 'female', avatar: { v: 2, art: 'polished', look: 'doll', skin: 'b98e6a', hair: 'sideComed', hairColor: '2c1b18', rearHair: 'longStraight', facialHair: 'none', clothing: 'turtleNeck', clothesColor: 'be185d', bg: 'sunset' } });
-  const rec = await addUser('Recruiter Demo', 'recruiter@capaciti.org.za', 'recruiter', '1988-04-15', { position: 'Talent Partner', employeeId: 'CAP-0301' });
-  const fac = await addUser('Naledi Sithole', 'facilitator@capaciti.org.za', 'facilitator', '1990-09-21', { position: 'Learning Facilitator', employeeId: 'CAP-0220', gender: 'female' });
-  for (const stream of ['Software Development', 'Data Science & Analytics', 'Cybersecurity']) await db.run('INSERT INTO facilitator_streams (user_id, stream) VALUES (?, ?)', fac.id, stream);
-  const team = { mentor: 'Thabo Mokoena', techChamp: 'Kyle Adams', supervisor: 'Aisha Patel' };
-  const c1 = await addUser('Lerato Khumalo', 'lerato@example.com', 'candidate', dobIn(9, 2001), { cohort: '2026 Cohort 1 · Cape Town', stream: 'Software Development', ...team, gender: 'female' });
-  const c2 = await addUser('Sipho Ndlovu', 'sipho@example.com', 'candidate', dobIn(0, 2002), { cohort: '2026 Cohort 1 · Johannesburg', stream: 'Data Science & Analytics', mentor: 'Aisha Patel', techChamp: 'Naledi Sithole', supervisor: 'Thabo Mokoena', gender: 'male', avatar: { v: 2, art: 'classic', look: 'tactical', skin: '614335', hair: 'shortFlat', hairColor: '2c1b18', hatColor: '4b5320', facialHair: 'beardLight', clothing: 'hoodie', clothesColor: '4b5320', graphic: 'skullOutline', accessory: 'wayfarers', accessoryColor: '151613', bg: 'camo' } });
-  const c3 = await addUser('Zanele Mthembu', 'zanele@example.com', 'candidate', dobIn(40, 2000), { cohort: '2026 Cohort 1 · Cape Town', stream: 'Cloud Engineering', ...team, gender: 'female', avatar: { v: 2, art: 'classic', look: 'doll', skin: 'ae5d29', hair: 'dreads02', hairColor: '2c1b18', hatColor: '1d2951', facialHair: 'none', clothing: 'shirtScoopNeck', clothesColor: 'ec4899', graphic: 'diamond', accessory: 'wayfarers', accessoryColor: 'f1d1d1', bg: 'sunset' } });
-  const c4 = await addUser('Kagiso Molefe', 'kagiso@example.com', 'candidate', dobIn(4, 2003), { cohort: '2026 Cohort 2 · Remote', stream: 'Cybersecurity', mentor: 'Aisha Patel', techChamp: 'Kyle Adams', supervisor: 'Nomsa Dlamini', gender: 'male' });
-  const c5 = await addUser('Amahle Zulu', 'amahle@example.com', 'candidate', '2001-11-30', { cohort: '2026 Cohort 2 · Cape Town', stream: 'UX/UI Design', ...team, gender: 'female', avatar: { v: 2, art: 'classic', look: 'runway', skin: '614335', hair: 'fro', hairColor: '2c1b18', hatColor: '1d2951', facialHair: 'none', clothing: 'blazerAndShirt', clothesColor: 'f25251', graphic: 'diamond', accessory: 'round', accessoryColor: 'd4af37', bg: 'night' } });
+  // CAPACITI team (demo). Staff dates of birth are not stored: real staff details stay private.
+  const staff = (name, email, role, position) => addUser(name, email, role, null, { position, employeeId: nextEmployeeId() });
+  let empSeq = 0;
+  function nextEmployeeId() { empSeq += 1; return `CAP-EMP-${new Date().getFullYear()}-${String(empSeq).padStart(4, '0')}`; }
+  const liyabona = await staff('Liyabona', 'liyabona@capaciti.org.za', 'facilitator', 'Talent Development Coach (Supervisor)');
+  const bradley = await staff('Bradley', 'bradley@capaciti.org.za', 'support', 'IT Support Coordinator');
+  const eudene = await staff('Eudene', 'eudene@capaciti.org.za', 'support', 'LAN & Desktop Support (FIT Team)');
+  const omphile = await staff('Omphile', 'omphile@capaciti.org.za', 'support', 'Software Lead Tech Champ & Tech Mentor');
+  const tarryn = await staff('Tarryn', 'tarryn@capaciti.org.za', 'support', 'Scrum Master');
+  const bianca = await staff('Bianca', 'bianca@capaciti.org.za', 'admin', 'Lead Talent Development Coach');
+  const shadley = await staff('Shadley', 'shadley@capaciti.org.za', 'admin', 'Tech Delivery Manager & Tech Mentor');
+  const ehrin = await staff('Ehrin', 'ehrin@capaciti.org.za', 'recruiter', 'Placement Specialist');
+  await db.run("INSERT INTO employee_id_counters (year, last_value) VALUES (?, ?) ON CONFLICT (year) DO UPDATE SET last_value = GREATEST(employee_id_counters.last_value, EXCLUDED.last_value)", new Date().getFullYear(), empSeq);
+  // Liyabona (Talent Development Coach) approves stage decisions for these streams.
+  for (const stream of ['Software Development', 'Data Science & Analytics', 'Cybersecurity']) await db.run('INSERT INTO facilitator_streams (user_id, stream) VALUES (?, ?)', liyabona.id, stream);
+  const fac = liyabona;
+  const admin = bianca;
+  const rec = ehrin;
+  const team = { supervisor: 'Liyabona', techChamp: 'Omphile', mentor: 'Shadley' };
+  const c1 = await addUser('Rebecca Adams', 'rebecca@capaciti.org.za', 'candidate', dobIn(9, 2001), { cohort: '2026 Cohort 1 · Cape Town', stream: 'Software Development', ...team });
+  const c2 = await addUser('Sipho Ndlovu', 'sipho@example.com', 'candidate', dobIn(0, 2002), { cohort: '2026 Cohort 1 · Johannesburg', stream: 'Data Science & Analytics', ...team, gender: 'male', avatar: { v: 2, art: 'classic', look: 'tactical', skin: '614335', hair: 'shortFlat', hairColor: '2c1b18', hatColor: '4b5320', facialHair: 'beardLight', clothing: 'hoodie', clothesColor: '4b5320', graphic: 'skullOutline', accessory: 'wayfarers', accessoryColor: '151613', bg: 'camo' } });
+  const c3 = await addUser('Zanele Mthembu', 'zanele@example.com', 'candidate', dobIn(40, 2000), { cohort: '2026 Cohort 1 · Cape Town', stream: 'Cloud Engineering', supervisor: 'Bianca', techChamp: 'Eudene', mentor: 'Shadley', gender: 'female', avatar: { v: 2, art: 'classic', look: 'doll', skin: 'ae5d29', hair: 'dreads02', hairColor: '2c1b18', hatColor: '1d2951', facialHair: 'none', clothing: 'shirtScoopNeck', clothesColor: 'ec4899', graphic: 'diamond', accessory: 'wayfarers', accessoryColor: 'f1d1d1', bg: 'sunset' } });
+  const c4 = await addUser('Kagiso Molefe', 'kagiso@example.com', 'candidate', dobIn(4, 2003), { cohort: '2026 Cohort 2 · Remote', stream: 'Cybersecurity', supervisor: 'Liyabona', techChamp: 'Bradley', mentor: 'Bianca', gender: 'male' });
+  const c5 = await addUser('Amahle Zulu', 'amahle@example.com', 'candidate', '2001-11-30', { cohort: '2026 Cohort 2 · Cape Town', stream: 'UX/UI Design', supervisor: 'Bianca', techChamp: 'Omphile', mentor: 'Shadley', gender: 'female', avatar: { v: 2, art: 'classic', look: 'runway', skin: '614335', hair: 'fro', hairColor: '2c1b18', hatColor: '1d2951', facialHair: 'none', clothing: 'blazerAndShirt', clothesColor: 'f25251', graphic: 'diamond', accessory: 'round', accessoryColor: 'd4af37', bg: 'night' } });
 
   // Realistic join dates for the demo candidates (stage decisions below are backdated too).
   for (const [c, d] of [[c1, 140], [c2, 120], [c3, 170], [c4, 45], [c5, 25]]) await db.run("UPDATE users SET created_at = iso_shift('-' || ? || ' days') WHERE id = ?", d, c.id);
@@ -107,46 +112,48 @@ async function main() {
 
   await make(c1, 'Connectivity', 'High', 'Mobile data not loading for online classes',
     'Since Monday my data bundle has not been working and I cannot join the live sessions on Teams.', 30, [
-      { assign: sup1, by: sup1, note: 'Taking this one — likely an APN issue.' },
-      { to: 'In Progress', by: sup1 },
-      { to: 'Waiting for Candidate', by: sup1, message: 'Please send a screenshot of your APN settings and your SIM network provider.' },
+      { assign: bradley, by: bradley, note: 'Taking this one — likely an APN issue.' },
+      { to: 'In Progress', by: bradley },
+      { to: 'Waiting for Candidate', by: bradley, message: 'Please send a screenshot of your APN settings and your SIM network provider.' },
     ]);
   await make(c1, 'Learning platform access', 'Medium', 'Cannot log in to the learning platform',
     'I get an "account locked" error when I try to sign in to the learning platform.', 100, [
-      { assign: sup2, by: admin },
-      { to: 'In Progress', by: sup2 },
-      { to: 'Resolved', by: sup2, resolution: 'Account unlocked and password reset link sent.', message: 'Your account is unlocked — please check your email.' },
+      { assign: eudene, by: bianca },
+      { to: 'In Progress', by: eudene },
+      { to: 'Resolved', by: eudene, resolution: 'Account unlocked and password reset link sent.', message: 'Your account is unlocked — please check your email.' },
       { to: 'Closed', by: c1 },
     ]);
   await make(c1, 'Career support', 'Low', 'Feedback on my CV draft',
     'Could someone review my CV before the work-readiness workshop next week?', 4);
   await make(c2, 'Attendance', 'Urgent', 'Attendance marked absent while on approved leave',
     'I was on approved family responsibility leave on 3 and 4 November but am showing as absent.', 10, [
-      { assign: sup1, by: sup1 },
-      { to: 'In Progress', by: sup1, note: 'Checking leave register with the facilitator.' },
+      { assign: omphile, by: omphile },
+      { to: 'In Progress', by: omphile, note: 'Checking the leave register with Liyabona.' },
     ]);
   await make(c2, 'Assessments', 'High', 'Request re-assessment for Module 4',
     'My Module 4 assessment submission failed to upload before the deadline due to load-shedding.', 60);
   await make(c2, 'Technical support', 'Medium', 'Laptop keyboard not working',
     'Several keys on my CAPACITI-issued laptop have stopped working.', 200, [
-      { assign: sup2, by: sup2 },
-      { to: 'In Progress', by: sup2 },
-      { to: 'Resolved', by: sup2, resolution: 'Device swapped at the Cape Town office.' },
+      { assign: eudene, by: eudene },
+      { to: 'In Progress', by: eudene },
+      { to: 'Resolved', by: eudene, resolution: 'Device swapped at the Cape Town office.' },
       { to: 'Reopened', by: c2, message: 'The replacement laptop has the same problem.' },
     ]);
   await make(c3, 'Administration', 'Low', 'Stipend payment date query',
     'When will the November stipend be paid? I need to plan my transport costs.', 150, [
-      { assign: admin, by: admin },
-      { to: 'In Progress', by: admin },
-      { to: 'Resolved', by: admin, resolution: 'Confirmed stipend payment date of 25 November.' },
+      { assign: bianca, by: bianca },
+      { to: 'In Progress', by: bianca },
+      { to: 'Resolved', by: bianca, resolution: 'Confirmed stipend payment date of 25 November.' },
     ]);
   await make(c3, 'Well-being referral', 'High', 'Would like to speak to a counsellor',
     'I have been feeling overwhelmed and would like to be referred to a counsellor.', 80, [
-      { assign: sup2, by: sup2 },
-      { to: 'In Progress', by: sup2, note: 'Confidential — referral submitted to wellness partner.' },
+      { assign: bianca, by: bianca },
+      { to: 'In Progress', by: bianca, note: 'Confidential — referral submitted to wellness partner.' },
     ]);
   await make(c3, 'Course content', 'Medium', 'Clarification on capstone brief',
-    'The capstone brief mentions an API integration — is a public API acceptable?', 2);
+    'The capstone brief mentions an API integration — is a public API acceptable?', 2, [
+      { assign: omphile, by: omphile, note: 'Curriculum question: confirming with the delivery team.' },
+    ]);
 
   // Roadmap evidence (exit criteria) ------------------------------------------------
   const reqs = await db.all('SELECT mr.id, m.sort_order AS m, mr.sort_order AS r FROM milestone_requirements mr JOIN milestones m ON m.id = mr.milestone_id ORDER BY m.sort_order, mr.sort_order');
@@ -154,7 +161,7 @@ async function main() {
     let day = startDaysAgo;
     for (const r of reqs) {
       if (r.m < upToMilestone || (r.m === upToMilestone && r.r <= partialCount)) {
-        await db.run("INSERT INTO candidate_requirement_progress (candidate_id, requirement_id, completed_at, verified_by) VALUES (?, ?, iso_shift('-' || ? || ' days'), ?)", candidate.id, r.id, day, sup1.id);
+        await db.run("INSERT INTO candidate_requirement_progress (candidate_id, requirement_id, completed_at, verified_by) VALUES (?, ?, iso_shift('-' || ? || ' days'), ?)", candidate.id, r.id, day, liyabona.id);
         day = Math.max(1, day - 6);
       }
     }
@@ -179,9 +186,9 @@ async function main() {
   await decide(c1, 'training', fac, 'Onboarding complete: contract signed, laptop and platform access confirmed, orientation attended.', 70);
   await decide(c2, 'training', fac, 'All enrolment documents verified and orientation attended.', 90);
   await decide(c2, 'work_ready', fac, 'Passed every assessment with 92% attendance; capstone dashboard submitted.', 25);
-  await decide(c3, 'training', admin, 'Enrolment checklist complete.', 130);
-  await decide(c3, 'work_ready', admin, 'Capstone deployed and all assessments passed.', 70);
-  await decide(c3, 'placed', admin, 'Matched with a corporate partner and internship agreement signed.', 12);
+  await decide(c3, 'training', shadley, 'Enrolment checklist complete.', 130);
+  await decide(c3, 'work_ready', shadley, 'Capstone deployed and all assessments passed.', 70);
+  await decide(c3, 'placed', shadley, 'Matched with a corporate partner and internship agreement signed.', 12);
 
   // Portfolios published for the recruiter preview --------------------------------------
   const savePortfolio = (id, headline, summary, skills) => db.run('INSERT INTO candidate_portfolios (candidate_id, is_published, headline, summary, skills) VALUES (?, 1, ?, ?, ?)', id, headline, summary, JSON.stringify(skills));
@@ -220,7 +227,7 @@ async function main() {
   for (const u of await db.all('SELECT id FROM users WHERE avatar_config IS NOT NULL')) await gamify.award(db, u.id, 'avatar');
 
   const closed = await db.all("SELECT id, candidate_id FROM requests WHERE status IN ('Resolved','Closed') ORDER BY id");
-  const ratings = [[5, 'Thabo sorted my login within an hour. Brilliant support!'], [4, 'Quick turnaround on the stipend date, thank you.'], [3, null]];
+  const ratings = [[5, 'Eudene sorted my login within an hour. Brilliant support!'], [4, 'Quick turnaround on the stipend date, thank you.'], [3, null]];
   for (const [i, r] of closed.entries()) {
     if (!ratings[i]) continue;
     await db.run('INSERT INTO request_ratings (request_id, candidate_id, rating, comment) VALUES (?, ?, ?, ?)', r.id, r.candidate_id, ratings[i][0], ratings[i][1]);
@@ -230,19 +237,20 @@ async function main() {
   await db.run("INSERT INTO feed_posts (kind, author_id, cohort, body, created_at) VALUES ('announcement', ?, NULL, ?, iso_shift('-2 days'))",
     admin.id, 'Welcome to the new CAPACITI Support portal! Meet Cammy, your assistant in the corner. She can walk you through everything.');
   await db.run("INSERT INTO feed_posts (kind, author_id, cohort, body, created_at) VALUES ('announcement', ?, ?, ?, iso_shift('-5 hours'))",
-    sup1.id, '2026 Cohort 1 · Cape Town', 'Reminder: capstone project check-ins are this Thursday at 10:00 in the Woodstock lab. Bring your progress board.');
-  await gamify.award(db, sup1.id, 'announcement');
+    tarryn.id, '2026 Cohort 1 · Cape Town', 'Reminder: capstone project check-ins are this Thursday at 10:00 in the Woodstock lab. Bring your progress board.');
+  await gamify.award(db, tarryn.id, 'announcement');
 
   console.log('Seed complete.\n');
   console.table([
-    { role: 'admin', email: 'admin@capaciti.org.za' },
-    { role: 'support', email: 'thabo@capaciti.org.za' },
-    { role: 'support', email: 'aisha@capaciti.org.za' },
-    { role: 'facilitator', email: 'facilitator@capaciti.org.za' },
-    { role: 'recruiter', email: 'recruiter@capaciti.org.za' },
-    { role: 'candidate', email: 'lerato@example.com' },
-    { role: 'candidate', email: 'sipho@example.com' },
-    { role: 'candidate', email: 'zanele@example.com' },
+    { name: 'Rebecca Adams', role: 'candidate', email: 'rebecca@capaciti.org.za' },
+    { name: 'Liyabona', role: 'facilitator', title: 'Talent Development Coach (Supervisor)', email: 'liyabona@capaciti.org.za' },
+    { name: 'Bradley', role: 'support', title: 'IT Support Coordinator', email: 'bradley@capaciti.org.za' },
+    { name: 'Eudene', role: 'support', title: 'LAN & Desktop Support (FIT Team)', email: 'eudene@capaciti.org.za' },
+    { name: 'Omphile', role: 'support', title: 'Software Lead Tech Champ & Tech Mentor', email: 'omphile@capaciti.org.za' },
+    { name: 'Tarryn', role: 'support', title: 'Scrum Master', email: 'tarryn@capaciti.org.za' },
+    { name: 'Bianca', role: 'admin', title: 'Lead Talent Development Coach', email: 'bianca@capaciti.org.za' },
+    { name: 'Shadley', role: 'admin', title: 'Tech Delivery Manager & Tech Mentor', email: 'shadley@capaciti.org.za' },
+    { name: 'Ehrin', role: 'recruiter', title: 'Placement Specialist', email: 'ehrin@capaciti.org.za' },
   ]);
   console.log(`All demo passwords: ${PASSWORD}`);
   void c5; void c4;

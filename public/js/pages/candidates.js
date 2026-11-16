@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import { initPage } from '../layout.js';
-import { esc, toast, avatarHtml, setBusy, showFieldErrors, fmtDate } from '../ui.js';
+import { esc, toast, avatarHtml, setBusy, showFieldErrors, fmtDate, attachTeamLists } from '../ui.js';
 import { createRoadmap } from '../components/roadmap.js';
 import { icon } from '../icons.js';
 import { onLive } from '../live.js';
@@ -49,7 +49,7 @@ async function select(id) {
           </div>
         </div>
         ${canEdit ? `<a href="/requests?q=${encodeURIComponent(p.fullName)}" class="btn btn-ghost">View requests</a>` : ''}
-        ${['admin', 'facilitator'].includes(me.role) ? `<a href="/stage-decisions?candidate=${p.id}" class="btn btn-primary">Review stage</a>` : ''}
+        ${['admin', 'facilitator', 'support'].includes(me.role) ? `<a href="/stage-decisions?candidate=${p.id}" class="btn btn-primary">Review stage</a>` : ''}
       </div>
       ${p.accessibility?.needs?.length ? `<div class="relative mt-4 rounded-xl border border-white/15 bg-ink/40 p-3 text-sm"><p class="flex items-center gap-1.5 font-semibold">${icon('accessibility', 'h-4 w-4')}Accessibility needs</p>
         <p class="mt-1 text-white/75">${p.accessibility.needs.map((n) => esc(needLabel(n))).join(' · ')}</p>${p.accessibility.notes ? `<p class="mt-1 text-xs text-white/60" translate="no">${esc(p.accessibility.notes)}</p>` : ''}</div>` : ''}
@@ -71,6 +71,7 @@ async function select(id) {
     <div id="roadmap-wrap" class="animate-fade-up [animation-delay:160ms]"></div>`;
 
   const form = document.getElementById('cand-form');
+  attachTeamLists(form, options);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = form.querySelector('button');

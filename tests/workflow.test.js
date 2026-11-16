@@ -158,10 +158,17 @@ test('analytics summary is staff-only', async () => {
 });
 
 test('admin creates staff with a temporary password that must be changed', async () => {
-  const bad = await call('admin', 'POST', '/admin/users', { firstName: 'No', surname: 'Id', email: 'noid@t.test', role: 'support' });
-  assert.equal(bad.status, 400);
+  // Employee IDs: generated when left blank (CAP-EMP-YYYY-NNNN), validated when typed.
+  const gen = await call('admin', 'POST', '/admin/users', { firstName: 'No', surname: 'Id', email: 'noid@t.test', role: 'support' });
+  assert.equal(gen.status, 201);
+  const genId = (await db.one('SELECT employee_id FROM staff_profiles WHERE user_id = ?', gen.body.id)).employee_id;
+  assert.match(genId, /^CAP-EMP-\d{4}-\d{4}$/);
+  const preview = await call('admin', 'GET', '/admin/employee-ids/next');
+  assert.notEqual(preview.body.employeeId, genId);
+  assert.equal((await call('admin', 'POST', '/admin/users', { firstName: 'Bad', surname: 'Format', email: 'badid@t.test', role: 'support', employeeId: 'CAP-9001' })).status, 400);
+  assert.equal((await call('admin', 'POST', '/admin/users', { firstName: 'Dup', surname: 'Id', email: 'dupid@t.test', role: 'support', employeeId: genId })).status, 409);
   const r = await call('admin', 'POST', '/admin/users', {
-    firstName: 'Temp', surname: 'Staff', email: 'temp@t.test', role: 'support', position: 'Support Specialist', employeeId: 'CAP-9001', dateOfBirth: '1990-02-02',
+    firstName: 'Temp', surname: 'Staff', email: 'temp@t.test', role: 'support', position: 'Support Specialist', employeeId: 'CAP-EMP-2025-0901', dateOfBirth: '1990-02-02',
   });
   assert.equal(r.status, 201);
   assert.match(r.body.tempPassword, /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{12}$/);

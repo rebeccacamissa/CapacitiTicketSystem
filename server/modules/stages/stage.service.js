@@ -20,7 +20,7 @@ const BACKWARD_REASON_MIN = 10;
 const DAY_MS = 86_400_000;
 
 async function decide(db, { candidateId, toStage, reason, actor }) {
-  if (!['admin', 'facilitator'].includes(actor.role)) throw forbidden('Only an admin or a facilitator can make stage decisions');
+  if (!['admin', 'facilitator', 'support'].includes(actor.role)) throw forbidden('Only an admin, a support coach or a facilitator can make stage decisions');
   const cand = await rules.assertCanSeeCandidate(db, actor, candidateId);
   if (!cand.is_active) throw conflict('CANDIDATE_INACTIVE', 'This candidate account is deactivated');
 

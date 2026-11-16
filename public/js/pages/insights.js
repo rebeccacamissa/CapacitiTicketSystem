@@ -69,7 +69,7 @@ async function load() {
     <li class="flex items-center gap-3">
       ${avatarHtml({ name: w.name, avatar: w.avatar, id: w.id }, 'h-9 w-9 text-xs')}
       <div class="min-w-0 flex-1">
-        <div class="flex items-baseline justify-between gap-2 text-sm"><span class="truncate font-medium">${esc(w.name)}</span>
+        <div class="flex items-baseline justify-between gap-2 text-sm"><span class="min-w-0 truncate"><span class="font-medium">${esc(w.name)}</span>${w.position ? ` <span class="text-xs text-white/50">· ${esc(w.position)}</span>` : ''}</span>
           <span class="shrink-0 tabular-nums"><strong>${w.active}</strong> <span class="text-white/45">active</span>${w.overdue ? ` <span class="badge ml-1 bg-warn/15 text-warn">${icon('alert', 'h-3 w-3')}${w.overdue}</span>` : ''}</span></div>
         <div class="mt-1.5 h-2 rounded-full bg-white/[0.07]"><div class="h-full rounded-r-[4px] rounded-l-full transition-[width] duration-1000" style="width:0;background:${BAR}" data-w="${(w.active / maxActive) * 100}%"></div></div>
         <p class="mt-1 flex items-center gap-1 text-[0.7rem] text-white/45">${w.resolved} resolved · avg ${fmtHours(w.avg_resolution_hours)}${w.ratings ? ` · <span class="inline-flex items-center gap-0.5 text-warn">${icon('star', 'h-3 w-3')}${w.avg_rating}</span> (${w.ratings})` : ''}</p>
@@ -89,7 +89,7 @@ async function load() {
   document.getElementById('overdue').innerHTML = d.oldestOverdue.length ? d.oldestOverdue.map((r) => `
     <li><a href="/request?id=${r.id}" class="flex items-center gap-3 rounded-2xl border border-warn/20 bg-warn/[0.06] p-3 transition hover:-translate-y-0.5 hover:bg-warn/10">
       <span class="min-w-0 flex-1"><span class="block text-xs font-semibold text-salmon-50">${esc(r.reference)}</span><span class="block truncate text-sm font-medium">${esc(r.title)}</span>
-      <span class="block text-xs text-white/50">${r.assignee_name ? esc(r.assignee_name) : 'Unassigned'}</span></span>
+      <span class="block text-xs text-white/50">${r.assignee_name ? `${esc(r.assignee_name)}${r.assignee_position ? ` · ${esc(r.assignee_position)}` : ''}` : 'Unassigned'}</span></span>
       ${priorityBadge(r.priority)}<span class="badge bg-warn/15 text-warn">${fmtHours(r.hours_overdue)} late</span></a></li>`).join('')
     : '<li class="text-sm text-ok">Nothing overdue. Great work!</li>';
 
@@ -106,7 +106,7 @@ async function load() {
       </div>
       <ul class="space-y-1.5">${cs.distribution.map((x) => `<li class="flex items-center gap-2 text-xs"><span class="w-8 tabular-nums text-white/60">${x.rating} ${icon('star', 'inline h-3 w-3')}</span>
         <span class="h-2 flex-1 rounded-full bg-white/[0.07]"><span class="block h-full rounded-r-[4px] rounded-l-full transition-[width] duration-1000" style="width:0;background:${BAR}" data-w="${(x.count / maxN) * 100}%"></span></span><span class="w-6 text-right tabular-nums">${x.count}</span></li>`).join('')}</ul>
-      <ul class="space-y-2">${cs.recent.length ? cs.recent.map((r) => `<li class="rounded-xl bg-white/[0.04] p-3"><div class="flex items-center justify-between gap-2"><span class="flex">${stars(r.rating)}</span><a href="/request?id=${r.id}" class="text-xs text-salmon-50 hover:underline">${esc(r.reference)}</a></div><p class="mt-1 text-sm text-white/80">“${esc(r.comment)}”</p><p class="text-xs text-white/45">${esc(r.candidate_name)}</p></li>`).join('') : '<li class="text-sm text-white/50">No comments yet.</li>'}</ul>
+      <ul class="space-y-2">${cs.recent.length ? cs.recent.map((r) => `<li class="rounded-xl bg-white/[0.04] p-3"><div class="flex items-center justify-between gap-2"><span class="flex">${stars(r.rating)}</span><a href="/request?id=${r.id}" class="text-xs text-salmon-50 hover:underline">${esc(r.reference)}</a></div><p class="mt-1 text-sm text-white/80">“${esc(r.comment)}”</p><p class="text-xs text-white/45">${esc(r.candidate_name)}${r.assignee_name ? ` · helped by ${esc(r.assignee_name)}${r.assignee_position ? ` (${esc(r.assignee_position)})` : ''}` : ''}</p></li>`).join('') : '<li class="text-sm text-white/50">No comments yet.</li>'}</ul>
     </div>` : '<p class="text-sm text-white/50">No ratings yet. Candidates can rate requests once they are resolved.</p>';
   countUp(document.getElementById('csat'));
 

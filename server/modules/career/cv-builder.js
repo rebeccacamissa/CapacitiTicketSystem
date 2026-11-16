@@ -57,8 +57,12 @@ function clean(d = {}) {
   };
 }
 
-/** Render CV data to a PDF Buffer. */
-function renderPdf(cv) {
+/**
+ * Render CV data to a PDF Buffer.
+ * opts.template === 'capaciti' adds the CAPACITI header band and a programme section
+ * (stream, cohort, official stage, verified achievements); opts.targetRole is shown as-is.
+ */
+function renderPdf(cv, opts = {}) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 50, info: { Title: `${cv.fullName || 'CV'}`, Author: cv.fullName || '' } });
     const chunks = [];
@@ -70,7 +74,13 @@ function renderPdf(cv) {
     const muted = '#4b5563';
     const width = doc.page.width - 100;
 
-    doc.fillColor(ink).font('Helvetica-Bold').fontSize(22).text(cv.fullName || 'Your Name');
+    if (opts.template === 'capaciti') {
+      doc.rect(0, 0, doc.page.width, 34).fill(ink);
+      doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(10).text('CAPACITI', 50, 12, { characterSpacing: 2, continued: true })
+        .font('Helvetica').fillColor('#f1d1d1').text('   Candidate CV', { characterSpacing: 0 });
+      doc.y = 54;
+    }
+    doc.fillColor(ink).font('Helvetica-Bold').fontSize(22).text(cv.fullName || 'Your Name', 50);
     if (cv.headline) doc.font('Helvetica').fontSize(12).fillColor(accent).text(cv.headline);
     const contact = [cv.email, cv.phone, cv.location, cv.linkedin, cv.github].filter(Boolean).join('  ·  ');
     if (contact) doc.moveDown(0.3).fontSize(9).fillColor(muted).text(contact);
@@ -83,7 +93,15 @@ function renderPdf(cv) {
     };
     const bullet = (text) => doc.text(`•  ${text}`, { indent: 8, paragraphGap: 1 });
 
+    if (opts.targetRole) doc.moveDown(0.2).font('Helvetica-Bold').fontSize(9).fillColor(muted).text(`Applying for: ${opts.targetRole}`);
     if (cv.summary) { section('Profile'); doc.text(cv.summary, { align: 'left' }); }
+    const prog = opts.programme;
+    if (prog) {
+      section('CAPACITI programme');
+      doc.font('Helvetica-Bold').text([prog.stream, prog.cohort].filter(Boolean).join(', ') || 'CAPACITI digital skills programme');
+      doc.font('Helvetica').fillColor(muted).text(`Current stage: ${prog.stage}`).fillColor('#111827');
+      if (prog.achievements?.length) { doc.moveDown(0.2); prog.achievements.forEach(bullet); }
+    }
     if (cv.skills.length) { section('Skills'); doc.text(cv.skills.join('  ·  ')); }
     if (cv.experience.length) {
       section('Experience');

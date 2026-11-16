@@ -7,7 +7,7 @@ const crypto = require('node:crypto');
 const bcrypt = require('bcryptjs');
 const { bcryptRounds } = require('../../config/env');
 const { avatarOf } = require('../avatar/catalog');
-const { conflict, notFound } = require('../../utils/AppError');
+const { conflict, notFound, badRequest } = require('../../utils/AppError');
 
 // ---------------------------------------------------------------------------
 // Accounts
@@ -26,6 +26,23 @@ function generateTempPassword() {
   return chars.join('');
 }
 
+const EMPLOYEE_ID_RE = /^CAP-EMP-\d{4}-\d{4}$/;
+
+/**
+ * Next unique staff employee ID, e.g. CAP-EMP-2026-0007. The yearly counter row is
+ * locked by the upsert until the transaction ends, so concurrent creations never
+ * get the same number; IDs already in use (e.g. typed in by hand) are skipped.
+ */
+async function nextEmployeeId(db, now = new Date()) {
+  const year = now.getUTCFullYear();
+  for (;;) {
+    const { last_value: n } = await db.one(`INSERT INTO employee_id_counters (year, last_value) VALUES (?, 1)
+      ON CONFLICT (year) DO UPDATE SET last_value = employee_id_counters.last_value + 1 RETURNING last_value`, year);
+    const id = `CAP-EMP-${year}-${String(n).padStart(4, '0')}`;
+    if (!await db.one('SELECT 1 FROM staff_profiles WHERE employee_id = ?', id)) return id;
+  }
+}
+
 /** Replace a facilitator's stream assignments (names must be known streams). */
 async function setFacilitatorStreams(db, userId, streams) {
   const known = require('../../config/options').streams;
@@ -39,6 +56,9 @@ async function createUser(db, u) {
   const email = u.email.toLowerCase();
   if (await db.one('SELECT 1 FROM users WHERE email = ?', email)) {
     throw conflict('EMAIL_TAKEN', 'An account with that email already exists');
+  }
+  if (u.employeeId && u.role !== 'candidate' && !EMPLOYEE_ID_RE.test(u.employeeId)) {
+    throw badRequest('Employee IDs use the format CAP-EMP-YYYY-NNNN. Leave it blank to generate one.', { fields: { employeeId: 'Use CAP-EMP-YYYY-NNNN, or leave blank' } });
   }
   if (u.employeeId && await db.one('SELECT 1 FROM staff_profiles WHERE employee_id = ?', u.employeeId)) {
     throw conflict('EMPLOYEE_ID_TAKEN', 'That employee ID is already in use');
@@ -55,7 +75,7 @@ async function createUser(db, u) {
       await t.run('INSERT INTO candidate_profiles (user_id, cohort, stream, mentor, tech_champ, supervisor, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
         id, u.cohort || null, u.stream || null, u.mentor || null, u.techChamp || null, u.supervisor || null, u.createdBy || id);
     } else {
-      await t.run('INSERT INTO staff_profiles (user_id, position, employee_id) VALUES (?, ?, ?)', id, u.position || null, u.employeeId || null);
+      await t.run('INSERT INTO staff_profiles (user_id, position, employee_id) VALUES (?, ?, ?)', id, u.position || null, u.employeeId || await nextEmployeeId(t));
     }
     if (u.role === 'facilitator') await setFacilitatorStreams(t, id, u.streams || []);
     return id;
@@ -183,7 +203,7 @@ async function notifications(db, user) {
     return items;
   }
 
-  if (user.role === 'facilitator' || user.role === 'admin') {
+  if (['facilitator', 'admin', 'support'].includes(user.role)) {
     const stage = require('../stages/stage.service');
     const list = await stage.candidates(db, user);
     const ready = list.filter((c) => c.readyForReview || c.reviewRequested);
@@ -191,9 +211,14 @@ async function notifications(db, user) {
     const placements = list.filter((c) => c.pendingPlacement).length;
     if (placements) items.push({ type: 'placement', tone: 'info', title: `${placements} placement${placements > 1 ? 's' : ''} to confirm`, tkey: 'Placements to confirm: {n}', vars: { n: placements }, body: 'A recruiter reported a hire.', bkey: 'A recruiter reported a hire.', href: '/stage-decisions#placements' });
     const stuck = list.filter((c) => c.overdue).length;
-    if (stuck) items.push({ type: 'stuck', tone: 'warn', title: `${stuck} candidate${stuck > 1 ? 's are' : ' is'} past the expected time in their stage`, tkey: 'Candidates past their stage target: {n}', vars: { n: stuck }, body: 'Check whether they need support.', bkey: 'Check whether they need support.', href: user.role === 'admin' ? '/reports' : '/facilitator' });
+    if (stuck) items.push({ type: 'stuck', tone: 'warn', title: `${stuck} candidate${stuck > 1 ? 's are' : ' is'} past the expected time in their stage`, tkey: 'Candidates past their stage target: {n}', vars: { n: stuck }, body: 'Check whether they need support.', bkey: 'Check whether they need support.', href: user.role === 'facilitator' ? '/facilitator' : user.role === 'admin' ? '/reports' : '/stage-decisions' });
+    // Accessibility needs changed in the last 7 days (candidates this user can see).
+    const ids = list.map((c) => c.id);
+    const a11y = ids.length ? await db.all(`SELECT id, full_name FROM users WHERE id IN (${ids.map(() => '?').join(',')})
+      AND accessibility_updated_at >= iso_shift('-7 days') AND accessibility <> '{}' ORDER BY accessibility_updated_at DESC`, ids) : [];
+    for (const c of a11y) items.push({ type: 'accessibility', tone: 'info', title: `${c.full_name} updated their accessibility needs`, tkey: '{name} updated their accessibility needs', vars: { name: c.full_name }, body: 'Review and arrange accommodations.', bkey: 'Review and arrange accommodations.', href: `/candidates?id=${c.id}` });
     if (user.role === 'facilitator') return items;
-    const del = await db.one("SELECT COUNT(*) n FROM deletion_requests WHERE status = 'open'");
+    const del = user.role === 'admin' ? await db.one("SELECT COUNT(*) n FROM deletion_requests WHERE status = 'open'") : { n: 0 };
     if (del.n) items.push({ type: 'privacy', tone: 'warn', title: `${del.n} account deletion request${del.n > 1 ? 's' : ''}`, tkey: 'Account deletion requests: {n}', vars: { n: del.n }, body: 'POPIA requests need a response.', bkey: 'POPIA requests need a response.', href: '/admin#privacy' });
   }
 
@@ -201,6 +226,11 @@ async function notifications(db, user) {
     const last = await db.one(`SELECT d.to_stage, d.direction, ps.label, d.created_at FROM stage_decisions d JOIN programme_stages ps ON ps.key = d.to_stage
       WHERE d.candidate_id = ? AND d.direction <> 'initial' AND d.created_at >= iso_shift('-7 days') ORDER BY d.id DESC LIMIT 1`, user.id);
     if (last) items.push({ type: 'stage', tone: last.direction === 'forward' ? 'ok' : 'warn', title: `Your official stage is now ${last.label}`, tkey: 'Your official stage is now {stage}', vars: { stage: last.label }, body: 'Open your roadmap to see the decision.', bkey: 'Open your roadmap to see the decision.', href: '/dashboard#roadmap' });
+    // Announcements for everyone or for this candidate's cohort (last 3 days). Never staff-only alerts.
+    const news = await db.all(`SELECT p.id, p.body, a.full_name FROM feed_posts p LEFT JOIN users a ON a.id = p.author_id
+      WHERE p.kind = 'announcement' AND p.created_at >= iso_shift('-3 days')
+        AND (p.cohort IS NULL OR p.cohort = (SELECT cohort FROM candidate_profiles WHERE user_id = ?)) ORDER BY p.id DESC LIMIT 3`, user.id);
+    for (const n of news) items.push({ type: 'announcement', tone: 'info', title: `Announcement from ${n.full_name || 'the programme team'}`, tkey: 'Announcement from {name}', vars: { name: n.full_name || 'the programme team' }, body: n.body.length > 140 ? `${n.body.slice(0, 140)}…` : n.body, href: '/feed' });
     const invites = await db.all("SELECT id, company FROM interview_requests WHERE candidate_id = ? AND status = 'pending'", user.id);
     for (const i of invites) items.push({ type: 'interview', tone: 'celebrate', title: `Interview request from ${i.company}`, tkey: 'Interview request from {company}', vars: { company: i.company }, body: 'Accept or decline on your dashboard.', bkey: 'Accept or decline on your dashboard.', href: '/dashboard#interviews' });
     const waiting = await db.all("SELECT id, reference, title FROM requests WHERE candidate_id = ? AND status = 'Waiting for Candidate'", user.id);
@@ -223,6 +253,6 @@ async function notifications(db, user) {
 }
 
 module.exports = {
-  generateTempPassword, createUser, setFacilitatorStreams, getProfile, updateCandidateProfile,
+  generateTempPassword, createUser, setFacilitatorStreams, nextEmployeeId, EMPLOYEE_ID_RE, getProfile, updateCandidateProfile,
   birthdays, birthdayInfo, notifications,
 };

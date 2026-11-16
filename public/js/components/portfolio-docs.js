@@ -77,9 +77,54 @@ export async function initPortfolioDocs(root) {
   await refresh();
 }
 
+// ---- Offline fallback: standard CAPACITI CV template (no AI needed) ---------------------
+function initCvTemplate(root) {
+  root.innerHTML = `
+    <div class="flex flex-wrap items-center gap-2"><h3 class="text-lg">My CAPACITI CV</h3><span class="badge bg-white/10 text-white/70">${t('Works offline')}</span></div>
+    <p class="mt-1 text-sm text-white/60">${t('Create a clean, standard CAPACITI CV from your profile, skills, projects, certificates and verified programme achievements. Add the job you are applying for and the skills and projects it mentions are listed first. Nothing is added or reworded.')}</p>
+    <p class="mt-2 text-xs text-white/45">${t('AI tailoring is not switched on for this server. Edit the details in the CV builder on the Career page.')}</p>
+    <form data-template class="mt-4 space-y-4" novalidate>
+      <div><label for="tp-job" class="field-label">${t('Job title (optional)')}</label><input id="tp-job" name="jobTitle" maxlength="120" class="field" placeholder="${t('e.g. Junior Data Analyst')}"></div>
+      <div><label for="tp-desc" class="field-label">${t('Job advert (optional)')}</label><textarea id="tp-desc" name="jobDescription" rows="3" maxlength="6000" class="field"></textarea></div>
+      <div class="flex flex-wrap justify-end gap-2">
+        <a href="/career#cv-builder" class="btn btn-ghost">${t('Edit details')}</a>
+        <button type="button" class="btn btn-ghost" data-tp-download>${icon('download', 'h-4 w-4')}${t('Download PDF')}</button>
+        <button type="button" class="btn btn-primary" data-tp-save>${icon('folder', 'h-4 w-4')}${t('Save to my documents')}</button>
+      </div>
+    </form>`;
+  const form = root.querySelector('[data-template]');
+  const body = (save) => ({ jobTitle: form.jobTitle.value.trim() || undefined, jobDescription: form.jobDescription.value.trim() || undefined, save });
+  root.querySelector('[data-tp-download]').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    setBusy(btn, true, 'Preparing…');
+    try {
+      const res = await fetch('/api/career/cv/template', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body(false)) });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error?.message || 'Could not create the CV');
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (res.headers.get('content-disposition')?.match(/filename="([^"]+)"/) || [])[1] || 'CAPACITI CV.pdf';
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (err) { toast(err.message, 'error'); }
+    setBusy(btn, false);
+  });
+  root.querySelector('[data-tp-save]').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    setBusy(btn, true, 'Saving…');
+    try {
+      await api('/career/cv/template', { method: 'POST', body: body(true) });
+      await refresh();
+      toast(t('CAPACITI CV saved to your documents'), 'success');
+    } catch (err) { toast(err.message, 'error'); }
+    setBusy(btn, false);
+  });
+}
+
 // ---- AI CV tailoring --------------------------------------------------------------
 export async function initCvTailor(root) {
   const { enabled } = await api('/portfolio/cv/ai-status').catch(() => ({ enabled: false }));
+  if (!enabled) return initCvTemplate(root);
   root.innerHTML = `
     <div class="flex flex-wrap items-center gap-2"><h3 class="text-lg">Tailor my CV for a job</h3><span class="badge bg-purple/25 text-purple-30">${icon('sparkle', 'h-3.5 w-3.5')}AI · optional</span></div>
     <p class="mt-1 text-sm text-white/60">Tell us the job you want. The AI reorders, re-emphasises and rewords what is already in your CV so it matches the job. It never adds skills, results, numbers or experience you don't have. Anything the job asks for that your CV doesn't show is listed as a gap, not added. You review every change before anything is saved.</p>
